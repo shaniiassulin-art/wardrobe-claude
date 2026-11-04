@@ -1251,3 +1251,8 @@ button.combo__swatches { width: 100%; padding: 0; border: 0; background: none; c
 @media (max-width: 420px) { .combo__source { inset-inline-end: 14px; } }
 .combo__foot { min-width: 0; flex-wrap: nowrap; }
 .pv-look__link small { color: var(--muted); text-decoration: none; }
+/* Search Pinterest for looks in a combination's colours */
+.daily-combo__pinterest { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 8px; margin-top: 12px; padding: 11px 14px; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font-size: 13.5px; text-decoration: none; }
+.daily-combo__pinterest small { grid-column: 2; font-size: 11px; color: var(--muted); text-align: start; }
+.daily-combo__pinterest:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+.daily-combo__pinterest small { justify-self: start; }

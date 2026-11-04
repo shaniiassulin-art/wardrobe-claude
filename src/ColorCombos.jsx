@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowsClockwise, Camera, CaretDown, Check, Funnel, Heart, ImageSquare, MagicWand, Plus, Sparkle, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, Camera, CaretDown, Check, Funnel, Heart, ImageSquare, MagicWand, MagnifyingGlass, Plus, Sparkle, X } from "@phosphor-icons/react";
 import { COLOR_FAMILIES, colorFamily } from "./colors.js";
 import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
 import { useWishColors } from "./wish-colors.js";
-import { MYTHERESA_COLORS, MYTHERESA_PALETTES } from "./mytheresa-palettes.js";
+import { MYTHERESA_COLOR_KEYS, MYTHERESA_COLORS, MYTHERESA_PALETTES } from "./mytheresa-palettes.js";
 
 const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
@@ -31,7 +31,12 @@ export const SOURCES = [
 ];
 const color = (source) => ([name, hex]) => ({ name, hex, source, lab: hexToLab(hex), family: colorFamily(hex) });
 const WADA = WADA_COLORS.map(color("wada"));
-const MYTHERESA = MYTHERESA_COLORS.map(color("mytheresa"));
+const MYTHERESA = MYTHERESA_COLORS.map(color("mytheresa")).map((entry, index) => ({ ...entry, search: { lightblue: "light blue" }[MYTHERESA_COLOR_KEYS[index]] || MYTHERESA_COLOR_KEYS[index] }));
+// A plain English colour word for searching looks (the book's names are too rare)
+const FAMILY_WORDS = { black: "black", white: "white", gray: "grey", beige: "beige", brown: "brown", red: "red", pink: "pink", orange: "orange", yellow: "yellow", green: "green", turquoise: "teal", blue: "blue", purple: "purple" };
+const searchWord = (entry) => entry.search || FAMILY_WORDS[entry.family] || entry.name;
+// Pinterest search for outfits in a combination's colours
+const pinterestUrl = (palette) => `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(`${[...new Set(palette.colors.map(searchWord))].join(" ")} outfit`)}`;
 const COLORS = [...MYTHERESA, ...WADA];
 // The colours for filtering: near-identical ones (ΔE under 8) become one
 // swatch, grouped by family and ordered light to dark
@@ -469,6 +474,10 @@ function ComboWindow({ fixed, source, favorites, onToggleFavorite, wishColors, o
               );
             })}
           </div>
+          <a className="daily-combo__pinterest" href={pinterestUrl(palette)} target="_blank" rel="noopener noreferrer">
+            <MagnifyingGlass size={15} aria-hidden="true" /> לוקים בצבעים האלה בפינטרסט
+            <small dir="ltr">{[...new Set(palette.colors.map(searchWord))].join(" ")} outfit</small>
+          </a>
           <div className="daily-combo__meta">
             <p className="daily-combo__number">{fixed ? (palette.source === "mytheresa" ? `מלוקים של Mytheresa: הופיע ב-${palette.outfits} לוקים` : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
             <HeartButton on={favorites.includes(palette.key)} onClick={() => onToggleFavorite(palette.key)} className="is-big" />
