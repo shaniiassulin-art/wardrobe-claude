@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowsClockwise, Camera, CaretDown, Check, Heart, ImageSquare, MagicWand, Plus, Sparkle, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, Camera, CaretDown, Check, Funnel, Heart, ImageSquare, MagicWand, Plus, Sparkle, X } from "@phosphor-icons/react";
 import { COLOR_FAMILIES, colorFamily } from "./colors.js";
 import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
@@ -111,6 +111,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
   const [wishColors, addWishColor] = useWishColors(wardrobeId);
   const [shadeId, setShadeId] = useState(null);
   const [shadesOpen, setShadesOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
   const [pieceId, setPieceId] = useState(null);
   const [size, setSize] = useState(0);
@@ -199,7 +200,6 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
     <section className="combos" aria-label="שילובי צבעים">
       <div className="combos__intro">
         <h2>שילובי צבעים</h2>
-        <p>שני מאגרים קיימים: <strong>Polyvore</strong>, {POLYVORE_PALETTES.length} שילובים של הצבעים שהופיעו יחד הכי הרבה בלוקים אמיתיים, ו<strong>ספר הצבעים היפני</strong> של סאנזו ואדה, {WADA_PALETTES.length} שילובים. דגמי צבעים מתמונות של בגדים כדי למצוא שילובים.</p>
         <div className="combos__row combos__actions">
           <button type="button" className="combos__daily-btn" onClick={() => setDailyOpen(true)}>
             <Sparkle size={16} aria-hidden="true" /> השילוב היומי
@@ -280,26 +280,60 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
             </div>
           </div>
         )}
-        <div className="styling-choice__options combos__sources" role="radiogroup" aria-label="אוסף השילובים">
-          {SOURCES.map((entry) => (
-            <button key={entry.id} type="button" role="radio" aria-checked={source === entry.id} className={source === entry.id ? "is-on" : ""} onClick={() => setSource(entry.id)}>{entry.label}</button>
-          ))}
-        </div>
-        <div className="styling-choice__options combos__sizes" role="radiogroup" aria-label="מספר הצבעים">
-          {[[0, "הכל"], [2, "2 צבעים"], [3, "3 צבעים"], [4, "4 צבעים"]].map(([value, label]) => (
-            <button key={value} type="button" role="radio" aria-checked={size === value} className={size === value ? "is-on" : ""} onClick={() => setSize(value)}>{label}</button>
-          ))}
-        </div>
-        <div className="combos__row">
-          <button type="button" className={`filter-chip combos__fav-chip${onlyFavorites ? " is-on" : ""}`} aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites((value) => !value)}>
-            <Heart size={13} weight={onlyFavorites ? "fill" : "regular"} aria-hidden="true" /> מועדפים{favorites.length > 0 && <small>{favorites.length}</small>}
-          </button>
-          {active && (
-            <button type="button" className="wardrobe-filters__clear" onClick={() => { setShadeId(null); setPieceId(null); setSamples([]); setSize(0); setOnlyFavorites(false); }}>
-              <X size={13} aria-hidden="true" /> ניקוי
-            </button>
-          )}
-        </div>
+        {(() => {
+          const count = (source !== "all" ? 1 : 0) + (onlyFavorites ? 1 : 0) + (size ? 1 : 0);
+          const chip = (label, onRemove, extra = null) => (
+            <button key={label} type="button" className="filter-chip is-on" onClick={onRemove}>{extra}{label}<X size={11} aria-label="הסרה" /></button>
+          );
+          return (
+            <section className="wardrobe-filters combos__filter-box" aria-label="סינון השילובים">
+              <div className="wardrobe-filters__bar">
+                <button type="button" className={`wardrobe-filters__toggle${count ? " is-active" : ""}`} onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen}>
+                  <Funnel size={15} aria-hidden="true" />
+                  <span>{count ? `סינון (${count})` : "סינון"}</span>
+                </button>
+                {active && (
+                  <button type="button" className="wardrobe-filters__clear" onClick={() => { setShadeId(null); setPieceId(null); setSamples([]); setSize(0); setOnlyFavorites(false); setSource("all"); }}>
+                    <X size={13} aria-hidden="true" /> ניקוי
+                  </button>
+                )}
+                {!filtersOpen && count > 0 && (
+                  <div className="wardrobe-filters__summary">
+                    {source !== "all" && chip(SOURCES.find((entry) => entry.id === source).label, () => setSource("all"))}
+                    {onlyFavorites && chip("מועדפים", () => setOnlyFavorites(false), <Heart size={11} weight="fill" aria-hidden="true" />)}
+                    {size > 0 && chip(`${size} צבעים`, () => setSize(0))}
+                  </div>
+                )}
+              </div>
+              {filtersOpen && (
+                <div className="wardrobe-filters__panel">
+                  <fieldset className="wardrobe-filters__group">
+                    <legend>מאגר</legend>
+                    <div className="wardrobe-filters__chips">
+                      {SOURCES.map((entry) => (
+                        <button key={entry.id} type="button" className={`filter-chip${source === entry.id ? " is-on" : ""}`} aria-pressed={source === entry.id} onClick={() => setSource(entry.id)}>
+                          {entry.label}<small>{PALETTES.filter(inSource(entry.id)).length}</small>
+                        </button>
+                      ))}
+                      <button type="button" className={`filter-chip combos__fav-chip${onlyFavorites ? " is-on" : ""}`} aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites((value) => !value)}>
+                        <Heart size={13} weight={onlyFavorites ? "fill" : "regular"} aria-hidden="true" /> מועדפים<small>{favorites.length}</small>
+                      </button>
+                    </div>
+                  </fieldset>
+                  <fieldset className="wardrobe-filters__group">
+                    <legend>מספר צבעים</legend>
+                    <div className="wardrobe-filters__chips">
+                      {[[0, "הכל"], [2, "2 צבעים"], [3, "3 צבעים"], [4, "4 צבעים"]].map(([value, label]) => (
+                        <button key={value} type="button" className={`filter-chip${size === value ? " is-on" : ""}`} aria-pressed={size === value} onClick={() => setSize(value)}>{label}</button>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <button type="button" className="secondary-button wardrobe-filters__done" onClick={() => setFiltersOpen(false)}>סיום</button>
+                </div>
+              )}
+            </section>
+          );
+        })()}
         <button type="button" className={`wardrobe-filters__toggle combos__shades-toggle${shade ? " is-active" : ""}`} aria-expanded={shadesOpen} onClick={() => setShadesOpen((value) => !value)}>
           {shade ? <span className="filter-chip__dot" style={{ background: shade.hex }} aria-hidden="true" /> : <span className="combos__shades-dots" aria-hidden="true">{["#c0392b", "#f1c40f", "#3e8e41", "#2f5d9c"].map((hex) => <span key={hex} style={{ background: hex }} />)}</span>}
           <span>{shade ? `${shade.name} · ${SHADE_COUNTS[source].get(shade.id) || 0} שילובים` : "סינון לפי צבע"}</span>

@@ -87,7 +87,7 @@ function WishlistItems({ items, wardrobeId, onChange, onRemoved, selecting = fal
   const open = items.find((entry) => entry.id === openId) || null;
   const addModal = adding && <WishlistAddModal wardrobeId={wardrobeId} onAdded={onChange} onClose={() => setAdding(false)} />;
   const addButton = (
-    <button type="button" className="create-look-btn wishlist-add-btn" onClick={() => setAdding(true)}>
+    <button type="button" className="wardrobe-filters__toggle wishlist-add-btn" onClick={() => setAdding(true)}>
       <Plus size={15} aria-hidden="true" /> הוספת פריטים
     </button>
   );
