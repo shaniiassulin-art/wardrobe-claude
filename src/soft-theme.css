@@ -1221,3 +1221,32 @@ button.combo__swatches { width: 100%; padding: 0; border: 0; background: none; c
 .wish-color__have img { width: 26px; height: 26px; object-fit: contain; border-radius: 7px; background: #ece5db; }
 .wish-color__have span, .wish-color__none { width: 100%; font-size: 11px; color: var(--muted); margin-top: 2px; }
 .combo__number { white-space: nowrap; }
+/* Wishlist tabs: the count a little apart from the word */
+.wishlist-tabs__count { margin-inline-start: 7px; }
+/* "הוספת פריטים" like the site's other action buttons */
+.wishlist-add-btn.create-look-btn { height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 13.5px; box-shadow: none; }
+.wishlist-add-btn.create-look-btn:hover { background: var(--ink); color: var(--paper); opacity: .9; }
+/* Size of the combination as a selector, like the collection one */
+.combos__sizes { margin-top: 2px; }
+/* Which collection a combination is from (when showing all) */
+.combo__number { display: inline-flex; align-items: center; gap: 5px; }
+.combo__source { padding: 2px 7px; border-radius: 999px; font-size: 10px; line-height: 1.4; background: #ece3d7; color: #6f5a45; }
+.combo__source.is-wada { background: #e4e7ee; color: #4b5670; }
+/* Polyvore looks of a combination */
+.pv-looks { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.pv-looks h3 { margin: 0 0 4px; font-size: 14.5px; font-weight: 600; }
+.pv-looks h3 small { margin-inline-start: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.pv-looks__note { margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.pv-looks__list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.pv-look { padding: 10px 12px; border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.pv-look__link { display: grid; gap: 2px; color: var(--ink); text-decoration: none; }
+.pv-look__link strong { font-size: 13.5px; font-weight: 600; }
+.pv-look__link small { font-size: 11.5px; color: #a0563c; text-decoration: underline; text-underline-offset: 2px; }
+.pv-look__items { display: grid; gap: 2px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.pv-look__items li { display: flex; align-items: center; gap: 6px; }
+.pv-look__items .inspo-dot { width: 9px; height: 9px; }
+.pv-looks__more { margin-top: 10px; width: 100%; justify-content: center; }
+.combo__number { display: inline; }
+.combo__source { position: absolute; z-index: 1; bottom: 66px; inset-inline-end: 18px; pointer-events: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
+@media (max-width: 420px) { .combo__source { inset-inline-end: 14px; } }
+.combo__foot { min-width: 0; flex-wrap: nowrap; }

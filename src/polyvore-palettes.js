@@ -35,6 +35,8 @@ export const POLYVORE_COLORS = [
   ["לבן", "#f5f3ee"], // 22 white
   ["צהוב", "#f1c40f"], // 23 yellow
 ];
+// The colour names used in the dataset, in the same order
+export const POLYVORE_COLOR_KEYS = ["beige", "black", "blue", "blush", "brown", "burgundy", "camel", "coral", "cream", "denim", "green", "grey", "khaki", "lightblue", "mint", "navy", "olive", "orange", "pink", "purple", "red", "teal", "white", "yellow"];
 
 // [number, [colour indexes], outfits]
 export const POLYVORE_PALETTES = [

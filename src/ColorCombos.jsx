@@ -4,7 +4,7 @@ import { COLOR_FAMILIES, colorFamily } from "./colors.js";
 import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
 import { useWishColors } from "./wish-colors.js";
-import { POLYVORE_COLORS, POLYVORE_OUTFITS, POLYVORE_PALETTES } from "./polyvore-palettes.js";
+import { POLYVORE_COLOR_KEYS, POLYVORE_COLORS, POLYVORE_PALETTES } from "./polyvore-palettes.js";
 
 const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
@@ -285,11 +285,12 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
             <button key={entry.id} type="button" role="radio" aria-checked={source === entry.id} className={source === entry.id ? "is-on" : ""} onClick={() => setSource(entry.id)}>{entry.label}</button>
           ))}
         </div>
-        {source === "polyvore" && <p className="combos__source-note">מתוך מאגר Polyvore Outfits (Han ועמיתים, 2017, רישיון Apache 2.0): 21,889 לוקים שהרכיבו משתמשות באתר Polyvore. נקראו מילות הצבע בשמות הבגדים, הנעליים והתיקים ({POLYVORE_OUTFITS.toLocaleString("he-IL")} לוקים עם שני צבעים לפחות), ונשמרו הצבעים שהופיעו יחד בהכי הרבה לוקים. ליד כל שילוב כתוב בכמה לוקים הוא הופיע. במאגר יש רק שמות צבעים, ולכן כל צבע מוצג בגוון טיפוסי לשם שלו.</p>}
-        <div className="combos__row">
+        <div className="styling-choice__options combos__sizes" role="radiogroup" aria-label="מספר הצבעים">
           {[[0, "הכל"], [2, "2 צבעים"], [3, "3 צבעים"], [4, "4 צבעים"]].map(([value, label]) => (
-            <button key={value} type="button" className={`filter-chip${size === value ? " is-on" : ""}`} aria-pressed={size === value} onClick={() => setSize(value)}>{label}</button>
+            <button key={value} type="button" role="radio" aria-checked={size === value} className={size === value ? "is-on" : ""} onClick={() => setSize(value)}>{label}</button>
           ))}
+        </div>
+        <div className="combos__row">
           <button type="button" className={`filter-chip combos__fav-chip${onlyFavorites ? " is-on" : ""}`} aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites((value) => !value)}>
             <Heart size={13} weight={onlyFavorites ? "fill" : "regular"} aria-hidden="true" /> מועדפים{favorites.length > 0 && <small>{favorites.length}</small>}
           </button>
@@ -337,6 +338,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
           return (
             <article key={palette.key} className="combo">
               <HeartButton on={favorites.includes(palette.key)} onClick={() => toggleFavorite(palette.key)} className="is-over" />
+              {source === "all" && <span className={`combo__source is-${palette.source}`}>{palette.source === "polyvore" ? "Polyvore" : "הספר היפני"}</span>}
               <button type="button" className="combo__swatches" onClick={() => setOpenKey(palette.key)} aria-label={`פתיחת שילוב ${palette.label}`}>
                 {palette.colors.map((color, index) => (
                   <span key={index} className={`combo__swatch${(shade && SHADE_OF.get(color) === shadeId) || sampledColors.has(index) ? " is-picked" : ""}`} style={{ background: color.hex }} title={color.name} />
@@ -368,6 +370,48 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
           onCreateLook={(palette) => { setDailyOpen(false); setOpenKey(null); onCreateLook(forLook(palette)); }}
         />
       )}
+    </section>
+  );
+}
+
+// The Polyvore looks a combination appears in, most liked first. Polyvore closed
+// in 2018; each look links to its copy in the Internet Archive.
+const PAGE = 15;
+function PolyvoreLooks({ palette }) {
+  const [data, setData] = useState(null);
+  const [shown, setShown] = useState(PAGE);
+  useEffect(() => {
+    let alive = true;
+    import("./polyvore-looks.json").then((module) => { if (alive) setData(module.default || module); }).catch(() => alive && setData({ error: true }));
+    return () => { alive = false; };
+  }, []);
+  const ids = data?.byPalette?.[palette.number - 1] || [];
+  const dot = Object.fromEntries(POLYVORE_COLOR_KEYS.map((key, index) => [key, POLYVORE[index]]));
+  return (
+    <section className="pv-looks" aria-label="הלוקים שבהם השילוב מופיע">
+      <h3>הלוקים שבהם השילוב מופיע <small>{palette.outfits}</small></h3>
+      <p className="pv-looks__note">Polyvore נסגר ב-2018, ולכן כל לוק נפתח בעותק שלו בארכיון האינטרנט. לא לכל לוק נשמר שם עותק.</p>
+      {!data && <p className="pv-looks__note">טוען...</p>}
+      {data?.error && <p className="pv-looks__note">לא ניתן לטעון את הלוקים כרגע.</p>}
+      <ol className="pv-looks__list">
+        {ids.slice(0, shown).map((id) => {
+          const [name, likes, url, pieces] = data.looks[id];
+          return (
+            <li key={id} className="pv-look">
+              <a className="pv-look__link" href={`https://web.archive.org/web/2018/http://www.polyvore.com/${url}`} target="_blank" rel="noopener noreferrer">
+                <strong dir="auto">{name || "לוק בלי שם"}</strong>
+                <small>{likes} לייקים · לצפייה בלוק</small>
+              </a>
+              <ul className="pv-look__items">
+                {pieces.map(([piece, colorKey], index) => (
+                  <li key={index} dir="auto">{dot[colorKey] && <span className="inspo-dot" style={{ background: dot[colorKey].hex }} aria-hidden="true" />}{piece}</li>
+                ))}
+              </ul>
+            </li>
+          );
+        })}
+      </ol>
+      {ids.length > shown && <button type="button" className="lb-button pv-looks__more" onClick={() => setShown((value) => value + PAGE)}>עוד לוקים ({ids.length - shown})</button>}
     </section>
   );
 }
@@ -433,6 +477,7 @@ function ComboWindow({ fixed, source, favorites, onToggleFavorite, wishColors, o
               );
             })}
           </div>
+          {palette.source === "polyvore" && <PolyvoreLooks key={palette.key} palette={palette} />}
           <div className="daily-combo__meta">
             <p className="daily-combo__number">{fixed ? (palette.source === "polyvore" ? `ממאגר Polyvore: הופיע ב-${palette.outfits} לוקים` : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
             <HeartButton on={favorites.includes(palette.key)} onClick={() => onToggleFavorite(palette.key)} className="is-big" />

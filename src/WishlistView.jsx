@@ -4,7 +4,7 @@ import { ImageLightbox } from "./ImageLightbox.jsx";
 import { WishlistAddModal } from "./WishlistAddModal.jsx";
 import { PRICES } from "./prices.js";
 import { useWishColors } from "./wish-colors.js";
-import { hexToLab, deltaE, CLOSE } from "./color-match.js";
+import { hexToLab, deltaE2000 } from "./color-match.js";
 import { fittedImage, imageFallback, thumbUrl } from "./image-files.js";
 
 const PART_LABELS = {
@@ -27,7 +27,7 @@ export function WishlistView({ wardrobe = [], ...props }) {
       <div className="styling-choice__options wishlist-tabs" role="tablist" aria-label="חלקי ה-Wishlist">
         {[["items", "פריטים", props.items.length], ["colors", "צבעים", colors.length]].map(([id, label, count]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "is-on" : ""} onClick={() => choose(id)}>
-            {label}{count > 0 && <small> {count}</small>}
+            {label}{count > 0 && <small className="wishlist-tabs__count">{count}</small>}
           </button>
         ))}
       </div>
@@ -36,6 +36,7 @@ export function WishlistView({ wardrobe = [], ...props }) {
   );
 }
 
+const WISH_CLOSE = 9;
 // Colours she wants, each with the pieces she already has in a close shade
 function WishlistColors({ colors, wardrobe, onRemove }) {
   if (!colors.length) {
@@ -53,7 +54,8 @@ function WishlistColors({ colors, wardrobe, onRemove }) {
       <div className="wish-colors__grid">
         {colors.map((entry) => {
           const lab = hexToLab(entry.hex);
-          const close = wardrobe.filter((item) => Math.min(deltaE(hexToLab(item.color), lab), deltaE(hexToLab(item.secondaryColor), lab)) <= CLOSE);
+          // Pieces whose main colour looks the same (ΔE2000, as the eye sees it)
+          const close = wardrobe.filter((item) => deltaE2000(hexToLab(item.color), lab) <= WISH_CLOSE);
           const light = lab && lab[0] > 62;
           return (
             <article key={entry.id} className="wish-color">

@@ -2767,6 +2767,45 @@ export function App() {
     // on a page that selects something else
   };
 
+  // Swipe sideways on the page to move between the tabs (right to left, as the
+  // tabs read): a finger moving right goes to the next tab, left to the one before.
+  // Not when the swipe starts on something that scrolls sideways itself, or in a window.
+  const shownTypes = TYPES.filter((type) => type.id !== "archive" || archived.length > 0 || activeType === "archive");
+  const swipeRef = useRef(null);
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return undefined;
+    const scrollsSideways = (node) => {
+      for (let el = node; el && el !== pane; el = el.parentElement) {
+        if (el.scrollWidth > el.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(el).overflowX)) return true;
+        if (el.matches?.("input, textarea, select, [role='dialog'], .builder-modal-overlay, .lightbox, .combos__scan-photo")) return true;
+      }
+      return false;
+    };
+    const onStart = (event) => {
+      if (event.touches.length !== 1 || document.querySelector(".builder-modal-overlay, .lightbox, .viewer-overlay, .import-popover-backdrop[data-open='true']")) { swipeRef.current = null; return; }
+      const t = event.touches[0];
+      swipeRef.current = scrollsSideways(event.target) ? null : { x: t.clientX, y: t.clientY, at: Date.now() };
+    };
+    const onEnd = (event) => {
+      const start = swipeRef.current;
+      swipeRef.current = null;
+      if (!start) return;
+      const t = event.changedTouches[0];
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || Date.now() - start.at > 700) return;
+      const index = shownTypes.findIndex((type) => type.id === activeType);
+      const next = shownTypes[index + (dx > 0 ? 1 : -1)];
+      if (!next) return;
+      chooseType(next.id);
+      document.querySelector(`.category-nav button[data-type="${next.id}"]`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    };
+    pane.addEventListener("touchstart", onStart, { passive: true });
+    pane.addEventListener("touchend", onEnd, { passive: true });
+    return () => { pane.removeEventListener("touchstart", onStart); pane.removeEventListener("touchend", onEnd); };
+  });
+
   const saveSuitcase = (suitcase) => {
     const saved = { ...suitcase, garmentIds: [...new Set(suitcase.garmentIds || [])], outfitIds: [...new Set(suitcase.outfitIds || [])] };
     setSuitcases((current) => current.some((s) => s.id === saved.id) ? current.map((s) => (s.id === saved.id ? saved : s)) : [...current, saved]);
@@ -3076,9 +3115,10 @@ export function App() {
             </div>
           </div>
           <nav className="category-nav" aria-label="סינון לפי קטגוריה">
-            {TYPES.filter((type) => (type.id !== "archive" || archived.length > 0 || activeType === "archive") && true).map((type) => (
+            {shownTypes.map((type) => (
               <button
                 key={type.id}
+                data-type={type.id}
                 type="button"
                 className={activeType === type.id ? "active" : ""}
                 onClick={() => chooseType(type.id)}
