@@ -3005,7 +3005,7 @@ export function App() {
                 : activeType === "archive"
                 ? `${archived.length} בארכיון`
                 : activeType === "colors"
-                ? "מלתחת קפסולה וספר הצבעים היפני"
+                ? "Polyvore וספר הצבעים היפני"
                 : activeType === "wishlist"
                 ? `${wishlist.length} ${wishlist.length === 1 ? "פריט" : "פריטים"} לקנות`
                 : `${items.length} ${items.length === 1 ? "פריט" : "פריטים"}`}

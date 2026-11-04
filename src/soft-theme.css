@@ -1220,3 +1220,4 @@ button.combo__swatches { width: 100%; padding: 0; border: 0; background: none; c
 .wish-color__have { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 6px; }
 .wish-color__have img { width: 26px; height: 26px; object-fit: contain; border-radius: 7px; background: #ece5db; }
 .wish-color__have span, .wish-color__none { width: 100%; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.combo__number { white-space: nowrap; }

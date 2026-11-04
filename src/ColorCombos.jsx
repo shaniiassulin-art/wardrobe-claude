@@ -4,7 +4,7 @@ import { COLOR_FAMILIES, colorFamily } from "./colors.js";
 import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
 import { useWishColors } from "./wish-colors.js";
-import { CAPSULE_COLORS, CAPSULE_PALETTES } from "./capsule-palettes.js";
+import { POLYVORE_COLORS, POLYVORE_OUTFITS, POLYVORE_PALETTES } from "./polyvore-palettes.js";
 
 const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
@@ -22,17 +22,17 @@ function sampleColor(canvas, x, y, radius) {
   return toHex(median(channels[0]), median(channels[1]), median(channels[2]));
 }
 
-// Two collections: the Japanese colour book, and a capsule-wardrobe collection
-// built for this site around neutrals (see capsule-palettes.js)
+// Two existing collections: the colours that appear together in real outfits
+// of the Polyvore dataset, and the Japanese colour book (see the data files)
 export const SOURCES = [
   { id: "all", label: "הכל" },
-  { id: "capsule", label: "מלתחת קפסולה" },
+  { id: "polyvore", label: "לוקים מ-Polyvore" },
   { id: "wada", label: "ספר הצבעים היפני" },
 ];
 const color = (source) => ([name, hex]) => ({ name, hex, source, lab: hexToLab(hex), family: colorFamily(hex) });
 const WADA = WADA_COLORS.map(color("wada"));
-const CAPSULE = CAPSULE_COLORS.map(color("capsule"));
-const COLORS = [...CAPSULE, ...WADA];
+const POLYVORE = POLYVORE_COLORS.map(color("polyvore"));
+const COLORS = [...POLYVORE, ...WADA];
 // The colours for filtering: near-identical ones (ΔE under 8) become one
 // swatch, grouped by family and ordered light to dark
 const SHADES = (() => {
@@ -50,7 +50,7 @@ const SHADE_ROWS = COLOR_FAMILIES
 
 // `key` is unique across both collections (favourites are kept by it)
 const PALETTES = [
-  ...CAPSULE_PALETTES.map(([number, indexes]) => ({ key: 1000 + number, number, source: "capsule", label: `קפסולה ${number}`, colors: indexes.map((i) => CAPSULE[i]) })),
+  ...POLYVORE_PALETTES.map(([number, indexes, outfits]) => ({ key: 2000 + number, number, outfits, source: "polyvore", label: `Polyvore ${number}`, colors: indexes.map((i) => POLYVORE[i]) })),
   ...WADA_PALETTES.map(([number, indexes]) => ({ key: number, number, source: "wada", label: `#${number}`, colors: indexes.map((i) => WADA[i]) })),
 ];
 const inSource = (source) => (palette) => source === "all" || palette.source === source;
@@ -199,7 +199,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
     <section className="combos" aria-label="שילובי צבעים">
       <div className="combos__intro">
         <h2>שילובי צבעים</h2>
-        <p>שני אוספים: <strong>מלתחת קפסולה</strong>, {CAPSULE_PALETTES.length} שילובים שנבנו באתר סביב צבעי בסיס (שחור, לבן, בז׳, נייבי, ג׳ינס, אפור, חום), ו<strong>ספר הצבעים היפני</strong> של סאנזו ואדה, {WADA_PALETTES.length} שילובים. דגמי צבעים מתמונות של בגדים כדי למצוא שילובים.</p>
+        <p>שני מאגרים קיימים: <strong>Polyvore</strong>, {POLYVORE_PALETTES.length} שילובים של הצבעים שהופיעו יחד הכי הרבה בלוקים אמיתיים, ו<strong>ספר הצבעים היפני</strong> של סאנזו ואדה, {WADA_PALETTES.length} שילובים. דגמי צבעים מתמונות של בגדים כדי למצוא שילובים.</p>
         <div className="combos__row combos__actions">
           <button type="button" className="combos__daily-btn" onClick={() => setDailyOpen(true)}>
             <Sparkle size={16} aria-hidden="true" /> השילוב היומי
@@ -285,7 +285,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
             <button key={entry.id} type="button" role="radio" aria-checked={source === entry.id} className={source === entry.id ? "is-on" : ""} onClick={() => setSource(entry.id)}>{entry.label}</button>
           ))}
         </div>
-        {source === "capsule" && <p className="combos__source-note">אוסף שנבנה באתר לפי עקרונות סטיילינג מקובלים למלתחת קפסולה: בסיס ניטרלי ועד שני צבעי מבטא. הוא לא לקוח מספר או ממאגר מפורסם.</p>}
+        {source === "polyvore" && <p className="combos__source-note">מתוך מאגר Polyvore Outfits (Han ועמיתים, 2017, רישיון Apache 2.0): 21,889 לוקים שהרכיבו משתמשות באתר Polyvore. נקראו מילות הצבע בשמות הבגדים, הנעליים והתיקים ({POLYVORE_OUTFITS.toLocaleString("he-IL")} לוקים עם שני צבעים לפחות), ונשמרו הצבעים שהופיעו יחד בהכי הרבה לוקים. ליד כל שילוב כתוב בכמה לוקים הוא הופיע. במאגר יש רק שמות צבעים, ולכן כל צבע מוצג בגוון טיפוסי לשם שלו.</p>}
         <div className="combos__row">
           {[[0, "הכל"], [2, "2 צבעים"], [3, "3 צבעים"], [4, "4 צבעים"]].map(([value, label]) => (
             <button key={value} type="button" className={`filter-chip${size === value ? " is-on" : ""}`} aria-pressed={size === value} onClick={() => setSize(value)}>{label}</button>
@@ -343,7 +343,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
                 ))}
               </button>
               <div className="combo__foot">
-                <span className="combo__number">{palette.label}</span>
+                <span className="combo__number">{palette.source === "polyvore" ? `${palette.outfits} לוקים` : palette.label}</span>
                 {owned > 0 && (
                   <button type="button" className="combo__look" onClick={() => onCreateLook(forLook(palette))}>
                     <MagicWand size={13} aria-hidden="true" /> לוק מהשילוב
@@ -434,7 +434,7 @@ function ComboWindow({ fixed, source, favorites, onToggleFavorite, wishColors, o
             })}
           </div>
           <div className="daily-combo__meta">
-            <p className="daily-combo__number">{fixed ? (palette.source === "capsule" ? "מאוסף מלתחת הקפסולה" : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
+            <p className="daily-combo__number">{fixed ? (palette.source === "polyvore" ? `ממאגר Polyvore: הופיע ב-${palette.outfits} לוקים` : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
             <HeartButton on={favorites.includes(palette.key)} onClick={() => onToggleFavorite(palette.key)} className="is-big" />
           </div>
         </div>
