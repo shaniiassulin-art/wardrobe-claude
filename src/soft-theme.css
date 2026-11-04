@@ -1250,3 +1250,4 @@ button.combo__swatches { width: 100%; padding: 0; border: 0; background: none; c
 .combo__source { position: absolute; z-index: 1; bottom: 66px; inset-inline-end: 18px; pointer-events: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 @media (max-width: 420px) { .combo__source { inset-inline-end: 14px; } }
 .combo__foot { min-width: 0; flex-wrap: nowrap; }
+.pv-look__link small { color: var(--muted); text-decoration: none; }

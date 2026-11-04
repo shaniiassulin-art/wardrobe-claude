@@ -408,8 +408,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
   );
 }
 
-// The Polyvore looks a combination appears in, most liked first. Polyvore closed
-// in 2018; each look links to its copy in the Internet Archive.
+// The Polyvore looks a combination appears in, most liked first, with their pieces
 const PAGE = 15;
 function PolyvoreLooks({ palette }) {
   const [data, setData] = useState(null);
@@ -424,18 +423,17 @@ function PolyvoreLooks({ palette }) {
   return (
     <section className="pv-looks" aria-label="הלוקים שבהם השילוב מופיע">
       <h3>הלוקים שבהם השילוב מופיע <small>{palette.outfits}</small></h3>
-      <p className="pv-looks__note">Polyvore נסגר ב-2018, ולכן כל לוק נפתח בעותק שלו בארכיון האינטרנט. לא לכל לוק נשמר שם עותק.</p>
       {!data && <p className="pv-looks__note">טוען...</p>}
       {data?.error && <p className="pv-looks__note">לא ניתן לטעון את הלוקים כרגע.</p>}
       <ol className="pv-looks__list">
         {ids.slice(0, shown).map((id) => {
-          const [name, likes, url, pieces] = data.looks[id];
+          const [name, likes, , pieces] = data.looks[id];
           return (
             <li key={id} className="pv-look">
-              <a className="pv-look__link" href={`https://web.archive.org/web/2018/http://www.polyvore.com/${url}`} target="_blank" rel="noopener noreferrer">
+              <div className="pv-look__link">
                 <strong dir="auto">{name || "לוק בלי שם"}</strong>
-                <small>{likes} לייקים · לצפייה בלוק</small>
-              </a>
+                <small>{likes} לייקים</small>
+              </div>
               <ul className="pv-look__items">
                 {pieces.map(([piece, colorKey], index) => (
                   <li key={index} dir="auto">{dot[colorKey] && <span className="inspo-dot" style={{ background: dot[colorKey].hex }} aria-hidden="true" />}{piece}</li>
