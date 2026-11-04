@@ -1880,8 +1880,8 @@ function CustomOutfitModal({ items, modelRefUrl = null, onUpdateItem, initialIte
             })()}
 
             {palette && (
-              <div className="lb-palette" aria-label={`שילוב ${palette.number} מספר הצבעים היפני`}>
-                <span className="lb-palette__label">שילוב #{palette.number}</span>
+              <div className="lb-palette" aria-label={`שילוב ${palette.label || `#${palette.number}`}`}>
+                <span className="lb-palette__label">שילוב {palette.label || `#${palette.number}`}</span>
                 <div className="lb-palette__swatches">
                   {paletteColors.map((color, index) => {
                     const covered = selectedItems.some((item) => paletteMatch.get(item.id)?.index === index);
@@ -3005,7 +3005,7 @@ export function App() {
                 : activeType === "archive"
                 ? `${archived.length} בארכיון`
                 : activeType === "colors"
-                ? "לפי ספר הצבעים היפני"
+                ? "מלתחת קפסולה וספר הצבעים היפני"
                 : activeType === "wishlist"
                 ? `${wishlist.length} ${wishlist.length === 1 ? "פריט" : "פריטים"} לקנות`
                 : `${items.length} ${items.length === 1 ? "פריט" : "פריטים"}`}
@@ -3179,7 +3179,7 @@ export function App() {
           </Suspense>
         )}
         {activeType === "wishlist" && (
-          <WishlistView items={wishlist} wardrobeId={activeWardrobeId} selecting={selectKind === "wishlist"} checkedIds={checkedIds} onToggleCheck={toggleChecked} onChange={(entry) => setWishlist((current) => current.some((other) => other.id === entry.id) ? current.map((other) => other.id === entry.id ? entry : other) : [entry, ...current])} onRemoved={(id) => setWishlist((current) => current.filter((other) => other.id !== id))} />
+          <WishlistView wardrobe={items} items={wishlist} wardrobeId={activeWardrobeId} selecting={selectKind === "wishlist"} checkedIds={checkedIds} onToggleCheck={toggleChecked} onChange={(entry) => setWishlist((current) => current.some((other) => other.id === entry.id) ? current.map((other) => other.id === entry.id ? entry : other) : [entry, ...current])} onRemoved={(id) => setWishlist((current) => current.filter((other) => other.id !== id))} />
         )}
         {activeType === "archive" && (
           <ArchiveView items={archived} selecting={selectKind === "archive"} checkedIds={checkedIds} onToggleCheck={toggleChecked} onRestore={restoreArchived} />

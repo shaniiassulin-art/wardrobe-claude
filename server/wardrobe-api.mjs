@@ -3379,13 +3379,42 @@ Respond in strict JSON format:
       // Wishlist: photos (inspiration photos, screenshots) with the pieces she wants from
       // each, each piece with an exact color and description. Saving is free and keeps
       // only the photo; a clean AI catalog photo of a piece is made on request.
+      // Colours she wants (from a colour combination), kept in their own file
+      if (url.pathname === "/api/import/wish-colors" || url.pathname.startsWith("/api/import/wish-colors/")) {
+        const wId = resolveWardrobeId(request, url);
+        const dir = getWardrobeKeys(wId).dir;
+        const fileKey = dir ? `${dir}/wish-colors.json` : "wish-colors.json";
+        const stored = await store.getJSON(fileKey);
+        const colors = Array.isArray(stored?.colors) ? stored.colors : [];
+        if (request.method === "GET") return json(200, { colors });
+        if (request.method === "POST" && url.pathname === "/api/import/wish-colors") {
+          const input = await body(request);
+          const hex = /^#[0-9a-f]{6}$/i.test(input.hex || "") ? input.hex.toLowerCase() : null;
+          if (!hex) return json(400, { error: "צבע לא תקין" });
+          const next = colors.some((entry) => entry.hex === hex) ? colors : [{
+            id: randomUUID(),
+            hex,
+            name: String(input.name || "").trim().slice(0, 60),
+            combo: String(input.combo || "").trim().slice(0, 40),
+            addedAt: new Date().toISOString(),
+          }, ...colors].slice(0, 300);
+          await store.setJSON(fileKey, { version: 1, colors: next });
+          return json(200, { colors: next });
+        }
+        if (request.method === "DELETE") {
+          const id = decodeURIComponent(url.pathname.slice("/api/import/wish-colors/".length));
+          const next = colors.filter((entry) => entry.id !== id);
+          await store.setJSON(fileKey, { version: 1, colors: next });
+          return json(200, { colors: next });
+        }
+      }
       // Favourite colour combinations (numbers in the colour book), kept with the profile
       if (url.pathname === "/api/import/combo-favorites" && (request.method === "GET" || request.method === "PUT")) {
         const wId = resolveWardrobeId(request, url);
         const profile = await loadUserProfile(wId);
         if (request.method === "GET") return json(200, { favorites: Array.isArray(profile.comboFavorites) ? profile.comboFavorites : [] });
         const input = await body(request);
-        const favorites = [...new Set((Array.isArray(input.favorites) ? input.favorites : []).map(Number).filter((n) => Number.isInteger(n) && n > 0 && n < 1000))].slice(0, 400);
+        const favorites = [...new Set((Array.isArray(input.favorites) ? input.favorites : []).map(Number).filter((n) => Number.isInteger(n) && n > 0 && n < 10000))].slice(0, 600);
         await saveUserProfile(wId, { ...profile, comboFavorites: favorites });
         return json(200, { favorites });
       }

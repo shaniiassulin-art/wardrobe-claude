@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowsClockwise, Camera, CaretDown, Heart, ImageSquare, MagicWand, Plus, Sparkle, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, Camera, CaretDown, Check, Heart, ImageSquare, MagicWand, Plus, Sparkle, X } from "@phosphor-icons/react";
 import { COLOR_FAMILIES, colorFamily } from "./colors.js";
 import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
+import { useWishColors } from "./wish-colors.js";
+import { CAPSULE_COLORS, CAPSULE_PALETTES } from "./capsule-palettes.js";
 
 const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
@@ -20,8 +22,18 @@ function sampleColor(canvas, x, y, radius) {
   return toHex(median(channels[0]), median(channels[1]), median(channels[2]));
 }
 
-const COLORS = WADA_COLORS.map(([name, hex]) => ({ name, hex, lab: hexToLab(hex), family: colorFamily(hex) }));
-// The book's colours for filtering: near-identical ones (ΔE under 8) become one
+// Two collections: the Japanese colour book, and a capsule-wardrobe collection
+// built for this site around neutrals (see capsule-palettes.js)
+export const SOURCES = [
+  { id: "all", label: "הכל" },
+  { id: "capsule", label: "מלתחת קפסולה" },
+  { id: "wada", label: "ספר הצבעים היפני" },
+];
+const color = (source) => ([name, hex]) => ({ name, hex, source, lab: hexToLab(hex), family: colorFamily(hex) });
+const WADA = WADA_COLORS.map(color("wada"));
+const CAPSULE = CAPSULE_COLORS.map(color("capsule"));
+const COLORS = [...CAPSULE, ...WADA];
+// The colours for filtering: near-identical ones (ΔE under 8) become one
 // swatch, grouped by family and ordered light to dark
 const SHADES = (() => {
   const groups = [];
@@ -29,14 +41,30 @@ const SHADES = (() => {
     const group = groups.find((entry) => entry.members.every((i) => deltaE(COLORS[i].lab, color.lab) < 8));
     if (group) group.members.push(index); else groups.push({ members: [index] });
   });
-  return groups.map((group, id) => ({ id, members: group.members, hex: COLORS[group.members[0]].hex, name: group.members.map((i) => COLORS[i].name).join(" / "), family: COLORS[group.members[0]].family, lab: COLORS[group.members[0]].lab }));
+  return groups.map((group, id) => ({ id, members: group.members, hex: COLORS[group.members[0]].hex, name: COLORS[group.members[0]].name, names: group.members.map((i) => COLORS[i].name).join(" / "), family: COLORS[group.members[0]].family, lab: COLORS[group.members[0]].lab }));
 })();
 const SHADE_OF = new Map(SHADES.flatMap((shade) => shade.members.map((i) => [COLORS[i], shade.id])));
 const SHADE_ROWS = COLOR_FAMILIES
   .map((family) => ({ ...family, shades: SHADES.filter((shade) => shade.family === family.id).sort((a, b) => b.lab[0] - a.lab[0]) }))
   .filter((row) => row.shades.length);
 
-const PALETTES = WADA_PALETTES.map(([number, indexes]) => ({ number, colors: indexes.map((i) => COLORS[i]) }));
+// `key` is unique across both collections (favourites are kept by it)
+const PALETTES = [
+  ...CAPSULE_PALETTES.map(([number, indexes]) => ({ key: 1000 + number, number, source: "capsule", label: `קפסולה ${number}`, colors: indexes.map((i) => CAPSULE[i]) })),
+  ...WADA_PALETTES.map(([number, indexes]) => ({ key: number, number, source: "wada", label: `#${number}`, colors: indexes.map((i) => WADA[i]) })),
+];
+const inSource = (source) => (palette) => source === "all" || palette.source === source;
+const forLook = (palette) => ({ number: palette.number, label: palette.label, colors: palette.colors.map((entry) => ({ hex: entry.hex, name: entry.name })) });
+// How many combinations each shade appears in, per collection
+const SHADE_COUNTS = Object.fromEntries(SOURCES.map((source) => {
+  const counts = new Map();
+  for (const palette of PALETTES.filter(inSource(source.id))) {
+    for (const id of new Set(palette.colors.map((entry) => SHADE_OF.get(entry)))) counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  return [source.id, counts];
+}));
+const SOURCE_KEY = "combos-source";
+const readSource = () => { try { return SOURCES.some((entry) => entry.id === localStorage.getItem(SOURCE_KEY)) ? localStorage.getItem(SOURCE_KEY) : "all"; } catch { return "all"; } };
 
 // Every recommended combination from Sanzo Wada's "A Dictionary of Colour
 // Combinations", filtered by a colour of the book or a scanned garment, with the
@@ -76,6 +104,11 @@ function HeartButton({ on, onClick, className = "" }) {
 export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) {
   const [favorites, toggleFavorite] = useComboFavorites(wardrobeId);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [source, setSourceState] = useState(readSource);
+  const setSource = (value) => { setSourceState(value); setShadeId(null); try { localStorage.setItem(SOURCE_KEY, value); } catch { /* not kept */ } };
+  // A combination opened from its card: its colours large, to add one to the Wishlist
+  const [openKey, setOpenKey] = useState(null);
+  const [wishColors, addWishColor] = useWishColors(wardrobeId);
   const [shadeId, setShadeId] = useState(null);
   const [shadesOpen, setShadesOpen] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
@@ -95,7 +128,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
   const addSample = (hex) => setSamples((current) => {
     if (current.some((sample) => sample.hex === hex)) return current;
     const lab = hexToLab(hex);
-    const nearest = Math.min(...COLORS.map((color) => deltaE2000(lab, color.lab)));
+    const nearest = Math.min(...COLORS.filter((entry) => source === "all" || entry.source === source).map((entry) => deltaE2000(lab, entry.lab)));
     return [...current, { id: `${hex}-${Date.now()}`, hex, lab, exact: nearest <= SAMPLE_CLOSE, within: Math.max(SAMPLE_CLOSE, nearest + 2.5) }];
   });
   const removeSample = (id) => setSamples((current) => current.filter((sample) => sample.id !== id));
@@ -139,7 +172,8 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
     .sort((a, b) => a.d - b.d);
 
   const candidates = useMemo(() => PALETTES
-    .filter((palette) => !onlyFavorites || favorites.includes(palette.number))
+    .filter(inSource(source))
+    .filter((palette) => !onlyFavorites || favorites.includes(palette.key))
     .filter((palette) => !size || palette.colors.length === size)
     .filter((palette) => shadeId === null || palette.colors.some((color) => SHADE_OF.get(color) === shadeId))
     .filter((palette) => !piece || palette.colors.some((color) => Math.min(deltaE(piece.lab, color.lab), deltaE(piece.lab2, color.lab)) <= CLOSE))
@@ -152,7 +186,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
       });
       return { ...palette, sampledAt, sampled: sampledAt.filter((index) => index >= 0).length, matches: palette.colors.map(matchesFor) };
     }),
-  [shadeId, piece, samples, size, pieces, onlyFavorites, favorites]); // eslint-disable-line react-hooks/exhaustive-deps
+  [shadeId, piece, samples, size, pieces, onlyFavorites, favorites, source]); // eslint-disable-line react-hooks/exhaustive-deps
   // With sampled colours: the combinations that have all of them, or if there are
   // none, the ones that have the most of them
   const bestSampled = samples.length ? Math.max(0, ...candidates.map((palette) => palette.sampled)) : 0;
@@ -165,7 +199,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
     <section className="combos" aria-label="שילובי צבעים">
       <div className="combos__intro">
         <h2>שילובי צבעים</h2>
-        <p>348 שילובים מספר הצבעים היפני של סאנזו ואדה. דגמי צבעים מתמונות של בגדים כדי למצוא שילובים, ו"לוק מהשילוב" יציע לך בגדים בצבעים שלו.</p>
+        <p>שני אוספים: <strong>מלתחת קפסולה</strong>, {CAPSULE_PALETTES.length} שילובים שנבנו באתר סביב צבעי בסיס (שחור, לבן, בז׳, נייבי, ג׳ינס, אפור, חום), ו<strong>ספר הצבעים היפני</strong> של סאנזו ואדה, {WADA_PALETTES.length} שילובים. דגמי צבעים מתמונות של בגדים כדי למצוא שילובים.</p>
         <div className="combos__row combos__actions">
           <button type="button" className="combos__daily-btn" onClick={() => setDailyOpen(true)}>
             <Sparkle size={16} aria-hidden="true" /> השילוב היומי
@@ -222,7 +256,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
                 <span>
                   {bestSampled === samples.length || samples.length === 1
                     ? (samples.length === 1 ? "הצבע הקרוב אליו מסומן בכל שילוב בנקודה לבנה" : "בכל שילוב יש את כל הצבעים שדגמת, מסומנים בנקודה לבנה")
-                    : bestSampled > 0 ? `אין שילוב עם כל הצבעים. אלה השילובים עם ${bestSampled} מהם` : "אין בספר שילוב עם הצבעים האלה"}
+                    : bestSampled > 0 ? `אין שילוב עם כל הצבעים. אלה השילובים עם ${bestSampled} מהם` : "אין שילוב עם הצבעים האלה"}
                 </span>
               </p>
               <button type="button" className="lb-close combos__scanned-x" onClick={() => setSamples([])} aria-label="ניקוי הדגימות"><X size={14} /></button>
@@ -230,13 +264,13 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
             {samples.some((sample) => !sample.exact) && (
               <p className="combos__similar" role="status">
                 {samples.length === 1
-                  ? "אין בספר שילובים לצבע הזה. מוצגים שילובים לצבעים דומים לו."
-                  : "לחלק מהצבעים (מסומנים ב-≈) אין שילובים בספר. מוצגים שילובים לצבעים דומים להם."}
+                  ? "אין שילובים לצבע הזה. מוצגים שילובים לצבעים דומים לו."
+                  : "לחלק מהצבעים (מסומנים ב-≈) אין שילובים. מוצגים שילובים לצבעים דומים להם."}
               </p>
             )}
             <div className="combos__samples">
               {samples.map((sample) => (
-                <button key={sample.id} type="button" className={`combos__sample${sample.exact ? "" : " is-similar"}`} style={{ background: sample.hex }} onClick={() => removeSample(sample.id)} aria-label={sample.exact ? "הסרת הצבע" : "הסרת הצבע (אין לו שילובים בספר, מוצגים צבעים דומים)"}><X size={11} weight="bold" />{!sample.exact && <span className="combos__sample-similar" aria-hidden="true">≈</span>}</button>
+                <button key={sample.id} type="button" className={`combos__sample${sample.exact ? "" : " is-similar"}`} style={{ background: sample.hex }} onClick={() => removeSample(sample.id)} aria-label={sample.exact ? "הסרת הצבע" : "הסרת הצבע (אין לו שילובים, מוצגים צבעים דומים)"}><X size={11} weight="bold" />{!sample.exact && <span className="combos__sample-similar" aria-hidden="true">≈</span>}</button>
               ))}
               {lastPhotoRef.current && (
                 <button type="button" className="filter-chip" onClick={() => { canvasRef.current = lastPhotoRef.current.canvas; setScan(lastPhotoRef.current); }}><Plus size={13} aria-hidden="true" /> מאותה תמונה</button>
@@ -246,6 +280,12 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
             </div>
           </div>
         )}
+        <div className="styling-choice__options combos__sources" role="radiogroup" aria-label="אוסף השילובים">
+          {SOURCES.map((entry) => (
+            <button key={entry.id} type="button" role="radio" aria-checked={source === entry.id} className={source === entry.id ? "is-on" : ""} onClick={() => setSource(entry.id)}>{entry.label}</button>
+          ))}
+        </div>
+        {source === "capsule" && <p className="combos__source-note">אוסף שנבנה באתר לפי עקרונות סטיילינג מקובלים למלתחת קפסולה: בסיס ניטרלי ועד שני צבעי מבטא. הוא לא לקוח מספר או ממאגר מפורסם.</p>}
         <div className="combos__row">
           {[[0, "הכל"], [2, "2 צבעים"], [3, "3 צבעים"], [4, "4 צבעים"]].map(([value, label]) => (
             <button key={value} type="button" className={`filter-chip${size === value ? " is-on" : ""}`} aria-pressed={size === value} onClick={() => setSize(value)}>{label}</button>
@@ -261,19 +301,28 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
         </div>
         <button type="button" className={`wardrobe-filters__toggle combos__shades-toggle${shade ? " is-active" : ""}`} aria-expanded={shadesOpen} onClick={() => setShadesOpen((value) => !value)}>
           {shade ? <span className="filter-chip__dot" style={{ background: shade.hex }} aria-hidden="true" /> : <span className="combos__shades-dots" aria-hidden="true">{["#c0392b", "#f1c40f", "#3e8e41", "#2f5d9c"].map((hex) => <span key={hex} style={{ background: hex }} />)}</span>}
-          <span>{shade ? shade.name : "סינון לפי צבע"}</span>
+          <span>{shade ? `${shade.name} · ${SHADE_COUNTS[source].get(shade.id) || 0} שילובים` : "סינון לפי צבע"}</span>
           <CaretDown size={13} className="combos__shades-caret" aria-hidden="true" />
         </button>
-        {shadesOpen && <div className="combos__shades" role="group" aria-label="סינון לפי צבע מהספר">
-          {SHADE_ROWS.map((row) => (
+        {shadesOpen && <div className="combos__shades" role="group" aria-label="סינון לפי צבע">
+          <p className="combos__shades-note">המספר מתחת לכל צבע: בכמה שילובים הוא מופיע</p>
+          {SHADE_ROWS.map((row) => ({ ...row, shades: row.shades.filter((entry) => SHADE_COUNTS[source].get(entry.id)) })).filter((row) => row.shades.length).map((row) => (
             <div key={row.id} className="combos__shade-row">
               <span className="combos__shade-label">{row.label}</span>
               <div className="combos__shade-list">
-                {row.shades.map((entry) => (
-                  <button key={entry.id} type="button" className={`combos__shade${shadeId === entry.id ? " is-on" : ""}`} style={{ background: entry.hex }} title={entry.name} aria-label={entry.members.length > 1 ? `${entry.name} (${entry.members.length} גוונים קרובים)` : entry.name} aria-pressed={shadeId === entry.id} onClick={() => { setShadeId(shadeId === entry.id ? null : entry.id); setPieceId(null); setSamples([]); setShadesOpen(false); }}>
-                    {entry.members.length > 1 && <span className={entry.lab[0] > 62 ? "is-dark" : ""}>+{entry.members.length - 1}</span>}
-                  </button>
-                ))}
+                {row.shades.map((entry) => {
+                  const count = SHADE_COUNTS[source].get(entry.id);
+                  // Close shades merged into this swatch, in this collection
+                  const merged = entry.members.filter((i) => source === "all" || COLORS[i].source === source).length;
+                  return (
+                    <span key={entry.id} className="combos__shade-cell">
+                      <button type="button" className={`combos__shade${shadeId === entry.id ? " is-on" : ""}`} style={{ background: entry.hex }} title={entry.names} aria-label={`${entry.names}${merged > 1 ? `, ${merged} גוונים קרובים` : ""}, ב-${count} שילובים`} aria-pressed={shadeId === entry.id} onClick={() => { setShadeId(shadeId === entry.id ? null : entry.id); setPieceId(null); setSamples([]); setShadesOpen(false); }}>
+                        {merged > 1 && <span className={entry.lab[0] > 62 ? "is-dark" : ""}>+{merged - 1}</span>}
+                      </button>
+                      <small className="combos__shade-count" aria-hidden="true">{count}</small>
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -286,17 +335,17 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
           const owned = palette.matches.filter((list) => list.length).length;
           const sampledColors = new Set(palette.sampledAt.filter((index) => index >= 0));
           return (
-            <article key={palette.number} className="combo">
-              <HeartButton on={favorites.includes(palette.number)} onClick={() => toggleFavorite(palette.number)} className="is-over" />
-              <div className="combo__swatches">
+            <article key={palette.key} className="combo">
+              <HeartButton on={favorites.includes(palette.key)} onClick={() => toggleFavorite(palette.key)} className="is-over" />
+              <button type="button" className="combo__swatches" onClick={() => setOpenKey(palette.key)} aria-label={`פתיחת שילוב ${palette.label}`}>
                 {palette.colors.map((color, index) => (
                   <span key={index} className={`combo__swatch${(shade && SHADE_OF.get(color) === shadeId) || sampledColors.has(index) ? " is-picked" : ""}`} style={{ background: color.hex }} title={color.name} />
                 ))}
-              </div>
+              </button>
               <div className="combo__foot">
-                <span className="combo__number">#{palette.number}</span>
+                <span className="combo__number">{palette.label}</span>
                 {owned > 0 && (
-                  <button type="button" className="combo__look" onClick={() => onCreateLook({ number: palette.number, colors: palette.colors.map((color) => ({ hex: color.hex, name: color.name })) })}>
+                  <button type="button" className="combo__look" onClick={() => onCreateLook(forLook(palette))}>
                     <MagicWand size={13} aria-hidden="true" /> לוק מהשילוב
                   </button>
                 )}
@@ -306,7 +355,19 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
         })}
       </div>
       {!shown.length && <p className="look-filters__empty combos__none">{onlyFavorites && !favorites.length ? "עוד אין שילובים מועדפים. אפשר לסמן שילוב בלב." : "אין שילובים שמתאימים לסינון."}</p>}
-      {dailyOpen && <DailyCombo favorites={favorites} onToggleFavorite={toggleFavorite} canLook={(palette) => palette.colors.some((color) => matchesFor(color).length > 0)} onClose={() => setDailyOpen(false)} onCreateLook={(palette) => { setDailyOpen(false); onCreateLook(palette); }} />}
+      {(dailyOpen || openKey !== null) && (
+        <ComboWindow
+          fixed={openKey !== null ? PALETTES.find((palette) => palette.key === openKey) : null}
+          source={source}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          wishColors={wishColors}
+          onAddColor={addWishColor}
+          canLook={(palette) => palette.colors.some((entry) => matchesFor(entry).length > 0)}
+          onClose={() => { setDailyOpen(false); setOpenKey(null); }}
+          onCreateLook={(palette) => { setDailyOpen(false); setOpenKey(null); onCreateLook(forLook(palette)); }}
+        />
+      )}
     </section>
   );
 }
@@ -321,50 +382,66 @@ const dayIndex = (count) => {
   return hash % count;
 };
 
-// One combination of the day, with 2, 3 or 4 colours, and "ערבוב" for another
-function DailyCombo({ favorites, onToggleFavorite, canLook, onClose, onCreateLook }) {
+// One combination large, with each colour's name and a way to add it to the
+// Wishlist: the combination of the day (2, 3 or 4 colours, "ערבוב" for another),
+// or a combination opened from its card (`fixed`)
+function ComboWindow({ fixed, source, favorites, onToggleFavorite, wishColors, onAddColor, canLook, onClose, onCreateLook }) {
   const [size, setSize] = useState(readSize);
-  const pool = useMemo(() => PALETTES.filter((palette) => palette.colors.length === size), [size]);
-  const [shuffled, setShuffled] = useState(null); // a palette number, after "ערבוב"
-  const palette = (shuffled !== null && pool.find((entry) => entry.number === shuffled)) || pool[dayIndex(pool.length)];
+  const pool = useMemo(() => PALETTES.filter(inSource(source)).filter((palette) => palette.colors.length === size), [size, source]);
+  const [shuffled, setShuffled] = useState(null); // a palette key, after "ערבוב"
+  const palette = fixed || (shuffled !== null && pool.find((entry) => entry.key === shuffled)) || pool[dayIndex(pool.length)];
   const chooseSize = (value) => {
     setSize(value);
     setShuffled(null);
     try { localStorage.setItem(SIZE_KEY, String(value)); } catch { /* not kept */ }
   };
   const shuffle = () => {
-    const others = pool.filter((entry) => entry.number !== palette.number);
-    setShuffled(others[Math.floor(Math.random() * others.length)].number);
+    const others = pool.filter((entry) => entry.key !== palette.key);
+    setShuffled(others[Math.floor(Math.random() * others.length)].key);
   };
+  const wished = (entry) => wishColors.some((wish) => wish.hex.toLowerCase() === entry.hex.toLowerCase());
   return (
     <div className="builder-modal-overlay look-builder-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className="builder-modal look-builder daily-combo" role="dialog" aria-modal="true" aria-labelledby="daily-title">
         <header className="lb-header">
-          <h2 id="daily-title">{shuffled === null ? "השילוב היומי" : "שילוב אחר"}</h2>
+          <h2 id="daily-title">{fixed ? `שילוב ${palette.label}` : shuffled === null ? "השילוב היומי" : "שילוב אחר"}</h2>
           <button className="lb-close" type="button" onClick={onClose} aria-label="סגירה"><X size={18} /></button>
         </header>
         <div className="lb-body">
-          <div className="styling-choice__options daily-combo__sizes" role="radiogroup" aria-label="מספר הצבעים">
-            {[2, 3, 4].map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={size === value} className={size === value ? "is-on" : ""} onClick={() => chooseSize(value)}>{value} צבעים</button>
-            ))}
-          </div>
-          <div key={palette.number} className="daily-combo__colors">
-            {palette.colors.map((color, index) => (
-              <div key={index} className="daily-combo__color" style={{ background: color.hex }}>
-                <span className={color.lab[0] > 62 ? "is-dark" : ""}>{color.name}<small>{color.hex.toUpperCase()}</small></span>
+          {!fixed && (
+            <div className="styling-choice__options daily-combo__sizes" role="radiogroup" aria-label="מספר הצבעים">
+              {[2, 3, 4].map((value) => (
+                <button key={value} type="button" role="radio" aria-checked={size === value} className={size === value ? "is-on" : ""} onClick={() => chooseSize(value)}>{value} צבעים</button>
+              ))}
+            </div>
+          )}
+          <div key={palette.key} className="daily-combo__colors">
+            {palette.colors.map((entry, index) => (
+              <div key={index} className="daily-combo__color" style={{ background: entry.hex }}>
+                <span className={entry.lab[0] > 62 ? "is-dark" : ""}>{entry.name}<small dir="ltr">{entry.hex.toUpperCase()}</small></span>
               </div>
             ))}
           </div>
+          <div className="daily-combo__wish" role="group" aria-label="הוספת צבע לווישליסט">
+            {palette.colors.map((entry, index) => {
+              const on = wished(entry);
+              return (
+                <button key={index} type="button" className={`daily-combo__wish-btn${on ? " is-on" : ""}`} disabled={on} onClick={() => onAddColor({ hex: entry.hex, name: entry.name, combo: palette.label })} aria-label={on ? `${entry.name} כבר בווישליסט` : `הוספת ${entry.name} לווישליסט`}>
+                  {on ? <Check size={13} weight="bold" aria-hidden="true" /> : <Plus size={13} aria-hidden="true" />}
+                  <span>{on ? "בווישליסט" : "לווישליסט"}</span>
+                </button>
+              );
+            })}
+          </div>
           <div className="daily-combo__meta">
-            <p className="daily-combo__number">שילוב #{palette.number} מתוך {pool.length} שילובים של {size} צבעים</p>
-            <HeartButton on={favorites.includes(palette.number)} onClick={() => onToggleFavorite(palette.number)} className="is-big" />
+            <p className="daily-combo__number">{fixed ? (palette.source === "capsule" ? "מאוסף מלתחת הקפסולה" : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
+            <HeartButton on={favorites.includes(palette.key)} onClick={() => onToggleFavorite(palette.key)} className="is-big" />
           </div>
         </div>
         <footer className="lb-footer">
           <div className="lb-footer__actions">
-            <button className="lb-button" type="button" onClick={shuffle}><ArrowsClockwise size={15} /> ערבוב</button>
-            {canLook(palette) && <button className="lb-button is-primary" type="button" onClick={() => onCreateLook({ number: palette.number, colors: palette.colors.map((color) => ({ hex: color.hex, name: color.name })) })}>
+            {!fixed && <button className="lb-button" type="button" onClick={shuffle}><ArrowsClockwise size={15} /> ערבוב</button>}
+            {canLook(palette) && <button className="lb-button is-primary" type="button" onClick={() => onCreateLook(palette)}>
               <MagicWand size={15} /> לוק מהשילוב
             </button>}
           </div>

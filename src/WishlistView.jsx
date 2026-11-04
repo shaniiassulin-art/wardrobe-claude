@@ -3,6 +3,9 @@ import { ArrowClockwise, Check, MagicWand, MagnifyingGlassPlus, Plus, Trash, X }
 import { ImageLightbox } from "./ImageLightbox.jsx";
 import { WishlistAddModal } from "./WishlistAddModal.jsx";
 import { PRICES } from "./prices.js";
+import { useWishColors } from "./wish-colors.js";
+import { hexToLab, deltaE, CLOSE } from "./color-match.js";
+import { fittedImage, imageFallback, thumbUrl } from "./image-files.js";
 
 const PART_LABELS = {
   upperbody: "חולצה",
@@ -13,8 +16,70 @@ const PART_LABELS = {
   accessories_up: "אקססורי",
 };
 
-// The Wishlist: one card per saved photo, with the pieces she wants from it
-export function WishlistView({ items, wardrobeId, onChange, onRemoved, selecting = false, checkedIds = [], onToggleCheck }) {
+// The Wishlist in two parts: pieces she wants (from photos) and colours she wants
+// (from colour combinations)
+export function WishlistView({ wardrobe = [], ...props }) {
+  const [tab, setTab] = useState(() => { try { return localStorage.getItem("wishlist-tab") === "colors" ? "colors" : "items"; } catch { return "items"; } });
+  const [colors, , removeColor] = useWishColors(props.wardrobeId);
+  const choose = (value) => { setTab(value); try { localStorage.setItem("wishlist-tab", value); } catch { /* not kept */ } };
+  return (
+    <>
+      <div className="styling-choice__options wishlist-tabs" role="tablist" aria-label="חלקי ה-Wishlist">
+        {[["items", "פריטים", props.items.length], ["colors", "צבעים", colors.length]].map(([id, label, count]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "is-on" : ""} onClick={() => choose(id)}>
+            {label}{count > 0 && <small> {count}</small>}
+          </button>
+        ))}
+      </div>
+      {tab === "items" ? <WishlistItems {...props} /> : <WishlistColors colors={colors} wardrobe={wardrobe} onRemove={removeColor} />}
+    </>
+  );
+}
+
+// Colours she wants, each with the pieces she already has in a close shade
+function WishlistColors({ colors, wardrobe, onRemove }) {
+  if (!colors.length) {
+    return (
+      <div className="empty-wardrobe-container">
+        <div className="empty-wardrobe-card">
+          <h2 className="empty-wardrobe-title">עוד אין צבעים ב-Wishlist</h2>
+          <p className="empty-wardrobe-text">בעמוד שילובי הצבעים, פתחי שילוב (או את השילוב היומי) ולחצי "לווישליסט" מתחת לצבע שאת רוצה.</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <section className="wishlist-view wish-colors" aria-label="צבעים שאני רוצה">
+      <div className="wish-colors__grid">
+        {colors.map((entry) => {
+          const lab = hexToLab(entry.hex);
+          const close = wardrobe.filter((item) => Math.min(deltaE(hexToLab(item.color), lab), deltaE(hexToLab(item.secondaryColor), lab)) <= CLOSE);
+          const light = lab && lab[0] > 62;
+          return (
+            <article key={entry.id} className="wish-color">
+              <div className="wish-color__swatch" style={{ background: entry.hex }}>
+                <button type="button" className={`wish-color__remove${light ? " is-dark" : ""}`} onClick={() => onRemove(entry.id)} aria-label={`הסרת ${entry.name || "הצבע"} מה-Wishlist`}><X size={14} /></button>
+              </div>
+              <div className="wish-color__body">
+                <strong>{entry.name || entry.hex.toUpperCase()}</strong>
+                <small><bdi dir="ltr">{entry.hex.toUpperCase()}</bdi>{entry.combo ? ` · משילוב ${entry.combo}` : ""}</small>
+                {close.length > 0 ? (
+                  <div className="wish-color__have" title="בגדים שיש לך בגוון קרוב">
+                    {close.slice(0, 4).map((item) => <img key={item.id} src={thumbUrl(fittedImage(item.thumbnail || item.image), 120)} onError={imageFallback(item.thumbnail || item.image)} alt={item.name} title={item.name} loading="lazy" decoding="async" />)}
+                    <span>יש לך {close.length === 1 ? "בגד אחד" : `${close.length} בגדים`} בגוון קרוב</span>
+                  </div>
+                ) : <span className="wish-color__none">אין לך עדיין בגד בגוון הזה</span>}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// The pieces part: one card per saved photo, with the pieces she wants from it
+function WishlistItems({ items, wardrobeId, onChange, onRemoved, selecting = false, checkedIds = [], onToggleCheck }) {
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState(null);
   const open = items.find((entry) => entry.id === openId) || null;

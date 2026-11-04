@@ -1188,3 +1188,35 @@ h1, h2, h3, .lb-section__head h3, .empty-wardrobe-title { font-weight: 550; }
 .combos__scan-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .combos__scan-top .combos__scan-hint { margin: 0; }
 .combos__scanned { scroll-margin-top: 16px; }
+
+/* Colour collections */
+.combos__sources { margin-bottom: 2px; }
+.combos__source-note { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.combos__intro p strong { font-weight: 600; color: var(--ink); }
+/* How many combinations each shade is in */
+.combos__shades-note { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
+.combos__shade-cell { display: grid; justify-items: center; gap: 2px; }
+.combos__shade-count { font-size: 10px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+.combos__shade-list { gap: 6px 7px; }
+/* A combination card opens its window */
+button.combo__swatches { width: 100%; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; }
+/* Colours to the Wishlist, under each colour of the window */
+.daily-combo__wish { display: flex; gap: 6px; margin-top: 8px; }
+.daily-combo__wish-btn { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 4px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font: inherit; font-size: 11.5px; cursor: pointer; white-space: nowrap; }
+.daily-combo__wish-btn.is-on { background: var(--ink); color: var(--paper); box-shadow: none; cursor: default; }
+
+/* The Wishlist's two parts */
+.wishlist-tabs { margin: 18px var(--gutter, 20px) 0; }
+.wishlist-tabs small { opacity: .6; }
+.wish-colors__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; padding: 24px var(--gutter, 20px) 88px; }
+@media (max-width: 640px) { .wish-colors__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-bottom: 24px; } }
+.wish-color { display: grid; border-radius: 20px; overflow: hidden; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.wish-color__swatch { position: relative; aspect-ratio: 4 / 3; }
+.wish-color__remove { position: absolute; top: 8px; inset-inline-end: 8px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .25); color: #fff; cursor: pointer; }
+.wish-color__remove.is-dark { background: rgba(255, 255, 255, .6); color: var(--ink); }
+.wish-color__body { display: grid; gap: 3px; padding: 10px 12px 12px; }
+.wish-color__body strong { font-size: 14px; font-weight: 600; }
+.wish-color__body small { font-size: 11px; color: var(--muted); }
+.wish-color__have { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 6px; }
+.wish-color__have img { width: 26px; height: 26px; object-fit: contain; border-radius: 7px; background: #ece5db; }
+.wish-color__have span, .wish-color__none { width: 100%; font-size: 11px; color: var(--muted); margin-top: 2px; }
