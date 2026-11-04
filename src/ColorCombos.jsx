@@ -4,7 +4,7 @@ import { COLOR_FAMILIES, colorFamily } from "./colors.js";
 import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
 import { useWishColors } from "./wish-colors.js";
-import { MYTHERESA_COLOR_KEYS, MYTHERESA_COLORS, MYTHERESA_PALETTES } from "./mytheresa-palettes.js";
+import { MYTHERESA_COLORS, MYTHERESA_PALETTES } from "./mytheresa-palettes.js";
 
 const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
@@ -408,44 +408,6 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
   );
 }
 
-// Some of Mytheresa's looks in a combination's colours, with their pieces
-const PAGE = 10;
-const dots = Object.fromEntries(MYTHERESA_COLOR_KEYS.map((key, index) => [key, MYTHERESA[index]]));
-function SourceLooks({ palette }) {
-  const [data, setData] = useState(null);
-  const [shown, setShown] = useState(PAGE);
-  useEffect(() => {
-    let alive = true;
-    import("./mytheresa-looks.json").then((module) => { if (alive) setData(module.default || module); }).catch(() => alive && setData({ error: true }));
-    return () => { alive = false; };
-  }, []);
-  const ids = data?.byPalette?.[palette.number - 1] || [];
-  return (
-    <section className="pv-looks" aria-label="לוקים בצבעי השילוב">
-      <h3>לוקים של Mytheresa בצבעים האלה <small>{palette.outfits}</small></h3>
-      {!data && <p className="pv-looks__note">טוען...</p>}
-      {data?.error && <p className="pv-looks__note">לא ניתן לטעון את הלוקים כרגע.</p>}
-      {ids.length > 0 && palette.outfits > ids.length && <p className="pv-looks__note">מוצגים {ids.length} מתוך {palette.outfits} הלוקים</p>}
-      <ol className="pv-looks__list">
-        {ids.slice(0, shown).map((id) => {
-          // Only the pieces, as Mytheresa names them (the dataset's style notes were written by AI)
-          const [, , pieces] = data.looks[id];
-          return (
-            <li key={id} className="pv-look">
-              <ul className="pv-look__items">
-                {pieces.map(([piece, colorKey], index) => (
-                  <li key={index} dir="auto">{dots[colorKey] && <span className="inspo-dot" style={{ background: dots[colorKey].hex }} aria-hidden="true" />}{piece}</li>
-                ))}
-              </ul>
-            </li>
-          );
-        })}
-      </ol>
-      {ids.length > shown && <button type="button" className="lb-button pv-looks__more" onClick={() => setShown((value) => value + PAGE)}>עוד לוקים ({ids.length - shown})</button>}
-    </section>
-  );
-}
-
 const SIZE_KEY = "daily-combo-size";
 const readSize = () => { try { return Number(localStorage.getItem(SIZE_KEY)) || 3; } catch { return 3; } };
 // The same combination all day, a different one each day (per number of colours)
@@ -507,7 +469,6 @@ function ComboWindow({ fixed, source, favorites, onToggleFavorite, wishColors, o
               );
             })}
           </div>
-          {palette.source === "mytheresa" && <SourceLooks key={palette.key} palette={palette} />}
           <div className="daily-combo__meta">
             <p className="daily-combo__number">{fixed ? (palette.source === "mytheresa" ? `מלוקים של Mytheresa: הופיע ב-${palette.outfits} לוקים` : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
             <HeartButton on={favorites.includes(palette.key)} onClick={() => onToggleFavorite(palette.key)} className="is-big" />
