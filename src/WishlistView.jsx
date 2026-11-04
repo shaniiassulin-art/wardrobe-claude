@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowClockwise, Check, MagicWand, MagnifyingGlassPlus, Plus, Trash, X } from "@phosphor-icons/react";
 import { ImageLightbox } from "./ImageLightbox.jsx";
+import { ModalArrows, stepsIn } from "./ModalArrows.jsx";
 import { WishlistAddModal } from "./WishlistAddModal.jsx";
 import { PRICES } from "./prices.js";
 import { useWishColors } from "./wish-colors.js";
@@ -132,14 +133,14 @@ function WishlistItems({ items, wardrobeId, onChange, onRemoved, selecting = fal
         ))}
       </div>
       {addModal}
-      {open && <WishlistEntryModal entry={open} wardrobeId={wardrobeId} onChange={onChange} onRemoved={onRemoved} onClose={() => setOpenId(null)} />}
+      {open && <WishlistEntryModal key={open.id} nav={stepsIn(items, open.id, setOpenId)} entry={open} wardrobeId={wardrobeId} onChange={onChange} onRemoved={onRemoved} onClose={() => setOpenId(null)} />}
     </section>
   );
 }
 
 // One saved photo: zoom in and out, the pieces with their details, an AI catalog
 // photo of a chosen piece at low or medium quality, and "bought" / remove per piece
-function WishlistEntryModal({ entry, wardrobeId, onChange, onRemoved, onClose }) {
+function WishlistEntryModal({ entry, nav = {}, wardrobeId, onChange, onRemoved, onClose }) {
   const [zoomAt, setZoomAt] = useState(-1);
   const [making, setMaking] = useState(null); // `${pid}:${quality}`
   const [busy, setBusy] = useState(null);
@@ -188,6 +189,7 @@ function WishlistEntryModal({ entry, wardrobeId, onChange, onRemoved, onClose })
 
   return (
     <div className="builder-modal-overlay look-builder-overlay" onMouseDown={(event) => event.target === event.currentTarget && !making && onClose()}>
+      {zoomAt < 0 && !making && <ModalArrows onPrev={nav.onPrev} onNext={nav.onNext} label="התמונה" />}
       <div className="builder-modal look-builder wish-modal" role="dialog" aria-modal="true" aria-labelledby="wish-title">
         <header className="lb-header">
           <h2 id="wish-title">Wishlist</h2>

@@ -5,6 +5,7 @@ import { WardrobeImportFlow } from "./import-flow.jsx";
 import { OptimizedImage } from "./OptimizedImage.jsx";
 import { fittedImage, imageFallback, thumbUrl, toBrowserImage } from "./image-files.js";
 import { ImageLightbox } from "./ImageLightbox.jsx";
+import { ModalArrows, stepsIn } from "./ModalArrows.jsx";
 import { LuggageView, SuitcasePicker, newSuitcaseId } from "./Suitcases.jsx";
 import { EMPTY_FILTERS, WardrobeFilters, matchesFilters } from "./WardrobeFilters.jsx";
 import { PRICES, autoLooksPrice, lookOnModelPrice } from "./prices.js";
@@ -425,7 +426,7 @@ function ItemEditor({ draft, setDraft, palette, sampling, setSampling, sampleSta
   );
 }
 
-function ItemViewer({ item, modelRefUrl = null, suitcaseCount = 0, onPack, onCreateLook, onClose, onSave, onDelete, onModeledGenerated, onItemCreated }) {
+function ItemViewer({ item, nav = {}, modelRefUrl = null, suitcaseCount = 0, onPack, onCreateLook, onClose, onSave, onDelete, onModeledGenerated, onItemCreated }) {
   const [zoomSrc, setZoomSrc] = useState(null);
   const closeButtonRef = useRef(null);
   const imageRef = useRef(null);
@@ -673,8 +674,11 @@ function ItemViewer({ item, modelRefUrl = null, suitcaseCount = 0, onPack, onCre
     </div>
   );
 
+  // Moving to another piece is like closing: unsaved changes stop it
+  const guarded = (step) => step && (() => (isDirty ? nudgeUnsaved() : step()));
   return (
     <div className="viewer-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && requestClose()}>
+    <ModalArrows onPrev={guarded(nav.onPrev)} onNext={guarded(nav.onNext)} label="הפריט" />
     <div className="viewer-entry">
     <aside className={`viewer item-sheet${shaking ? " shake" : ""}`} role="dialog" aria-modal="true" aria-label="פריט מלתחה נבחר">
       <header className="item-sheet__header">
@@ -934,7 +938,7 @@ const lookImages = (look, items = []) => [
   ...(look.garments || []).map((garment) => ({ src: thumbUrl(lookPieceImage(garment, items), 1080), alt: garment.name })),
 ];
 
-function LookViewerModal({ look, isPhoto = false, items = [], onClose, onDelete, onPack, onCreateOnMe, onEdit, suitcaseCount = 0 }) {
+function LookViewerModal({ look, nav = {}, isPhoto = false, items = [], onClose, onDelete, onPack, onCreateOnMe, onEdit, suitcaseCount = 0 }) {
   const [deleting, setDeleting] = useState(false);
   const [zoomIndex, setZoomIndex] = useState(null);
 
@@ -947,6 +951,7 @@ function LookViewerModal({ look, isPhoto = false, items = [], onClose, onDelete,
 
   return (
     <div className="builder-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && zoomIndex === null && onClose()}>
+      {zoomIndex === null && <ModalArrows onPrev={nav.onPrev} onNext={nav.onNext} label="הלוק" />}
       <div className="builder-modal look-viewer">
         <header className="builder-header" style={{ marginBottom: "14px" }}>
           <div>
@@ -3329,7 +3334,9 @@ export function App() {
 
       {selectedItem && (
         <ItemViewer
+          key={selectedItem.id}
           item={selectedItem}
+          nav={stepsIn(visibleItems, selectedItem.id, setSelectedId)}
           modelRefUrl={modelRefUrl}
           suitcaseCount={suitcases.filter((s) => s.garmentIds?.includes(selectedItem.id)).length}
           onPack={(id) => setPackingIds([id])}
@@ -3417,7 +3424,9 @@ export function App() {
 
       {selectedLook && (
         <LookViewerModal
+          key={selectedLook.id}
           look={selectedLook}
+          nav={stepsIn(visibleLooks, selectedLook.id, (id) => setSelectedLook(visibleLooks.find((entry) => entry.id === id)))}
           isPhoto={Boolean(photoLooks[selectedLook.id])}
           items={items}
           onClose={() => setSelectedLook(null)}
