@@ -4,7 +4,7 @@ import { COLOR_FAMILIES, colorFamily } from "./colors.js";
 import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
 import { useWishColors } from "./wish-colors.js";
-import { POLYVORE_COLOR_KEYS, POLYVORE_COLORS, POLYVORE_PALETTES } from "./polyvore-palettes.js";
+import { MYTHERESA_COLOR_KEYS, MYTHERESA_COLORS, MYTHERESA_PALETTES } from "./mytheresa-palettes.js";
 
 const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
@@ -22,17 +22,17 @@ function sampleColor(canvas, x, y, radius) {
   return toHex(median(channels[0]), median(channels[1]), median(channels[2]));
 }
 
-// Two existing collections: the colours that appear together in real outfits
-// of the Polyvore dataset, and the Japanese colour book (see the data files)
+// Two existing collections: the colours that appear together in Mytheresa's
+// official looks (Garments2Look dataset), and the Japanese colour book
 export const SOURCES = [
   { id: "all", label: "הכל" },
-  { id: "polyvore", label: "לוקים מ-Polyvore" },
+  { id: "mytheresa", label: "לוקים של Mytheresa" },
   { id: "wada", label: "ספר הצבעים היפני" },
 ];
 const color = (source) => ([name, hex]) => ({ name, hex, source, lab: hexToLab(hex), family: colorFamily(hex) });
 const WADA = WADA_COLORS.map(color("wada"));
-const POLYVORE = POLYVORE_COLORS.map(color("polyvore"));
-const COLORS = [...POLYVORE, ...WADA];
+const MYTHERESA = MYTHERESA_COLORS.map(color("mytheresa"));
+const COLORS = [...MYTHERESA, ...WADA];
 // The colours for filtering: near-identical ones (ΔE under 8) become one
 // swatch, grouped by family and ordered light to dark
 const SHADES = (() => {
@@ -50,7 +50,7 @@ const SHADE_ROWS = COLOR_FAMILIES
 
 // `key` is unique across both collections (favourites are kept by it)
 const PALETTES = [
-  ...POLYVORE_PALETTES.map(([number, indexes, outfits]) => ({ key: 2000 + number, number, outfits, source: "polyvore", label: `Polyvore ${number}`, colors: indexes.map((i) => POLYVORE[i]) })),
+  ...MYTHERESA_PALETTES.map(([number, indexes, outfits]) => ({ key: 3000 + number, number, outfits, source: "mytheresa", label: `Mytheresa ${number}`, colors: indexes.map((i) => MYTHERESA[i]) })),
   ...WADA_PALETTES.map(([number, indexes]) => ({ key: number, number, source: "wada", label: `#${number}`, colors: indexes.map((i) => WADA[i]) })),
 ];
 const inSource = (source) => (palette) => source === "all" || palette.source === source;
@@ -372,14 +372,14 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
           return (
             <article key={palette.key} className="combo">
               <HeartButton on={favorites.includes(palette.key)} onClick={() => toggleFavorite(palette.key)} className="is-over" />
-              {source === "all" && <span className={`combo__source is-${palette.source}`}>{palette.source === "polyvore" ? "Polyvore" : "הספר היפני"}</span>}
+              {source === "all" && <span className={`combo__source is-${palette.source}`}>{palette.source === "mytheresa" ? "Mytheresa" : "הספר היפני"}</span>}
               <button type="button" className="combo__swatches" onClick={() => setOpenKey(palette.key)} aria-label={`פתיחת שילוב ${palette.label}`}>
                 {palette.colors.map((color, index) => (
                   <span key={index} className={`combo__swatch${(shade && SHADE_OF.get(color) === shadeId) || sampledColors.has(index) ? " is-picked" : ""}`} style={{ background: color.hex }} title={color.name} />
                 ))}
               </button>
               <div className="combo__foot">
-                <span className="combo__number">{palette.source === "polyvore" ? `${palette.outfits} לוקים` : palette.label}</span>
+                <span className="combo__number">{palette.source === "mytheresa" ? `${palette.outfits} לוקים` : palette.label}</span>
                 {owned > 0 && (
                   <button type="button" className="combo__look" onClick={() => onCreateLook(forLook(palette))}>
                     <MagicWand size={13} aria-hidden="true" /> לוק מהשילוב
@@ -408,35 +408,33 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
   );
 }
 
-// The Polyvore looks a combination appears in, most liked first, with their pieces
-const PAGE = 15;
-function PolyvoreLooks({ palette }) {
+// Some of Mytheresa's looks in a combination's colours, with their pieces
+const PAGE = 10;
+const dots = Object.fromEntries(MYTHERESA_COLOR_KEYS.map((key, index) => [key, MYTHERESA[index]]));
+function SourceLooks({ palette }) {
   const [data, setData] = useState(null);
   const [shown, setShown] = useState(PAGE);
   useEffect(() => {
     let alive = true;
-    import("./polyvore-looks.json").then((module) => { if (alive) setData(module.default || module); }).catch(() => alive && setData({ error: true }));
+    import("./mytheresa-looks.json").then((module) => { if (alive) setData(module.default || module); }).catch(() => alive && setData({ error: true }));
     return () => { alive = false; };
   }, []);
   const ids = data?.byPalette?.[palette.number - 1] || [];
-  const dot = Object.fromEntries(POLYVORE_COLOR_KEYS.map((key, index) => [key, POLYVORE[index]]));
   return (
-    <section className="pv-looks" aria-label="הלוקים שבהם השילוב מופיע">
-      <h3>הלוקים שבהם השילוב מופיע <small>{palette.outfits}</small></h3>
+    <section className="pv-looks" aria-label="לוקים בצבעי השילוב">
+      <h3>לוקים של Mytheresa בצבעים האלה <small>{palette.outfits}</small></h3>
       {!data && <p className="pv-looks__note">טוען...</p>}
       {data?.error && <p className="pv-looks__note">לא ניתן לטעון את הלוקים כרגע.</p>}
+      {ids.length > 0 && palette.outfits > ids.length && <p className="pv-looks__note">מוצגים {ids.length} מתוך {palette.outfits} הלוקים</p>}
       <ol className="pv-looks__list">
         {ids.slice(0, shown).map((id) => {
-          const [name, likes, , pieces] = data.looks[id];
+          // Only the pieces, as Mytheresa names them (the dataset's style notes were written by AI)
+          const [, , pieces] = data.looks[id];
           return (
             <li key={id} className="pv-look">
-              <div className="pv-look__link">
-                <strong dir="auto">{name || "לוק בלי שם"}</strong>
-                <small>{likes} לייקים</small>
-              </div>
               <ul className="pv-look__items">
                 {pieces.map(([piece, colorKey], index) => (
-                  <li key={index} dir="auto">{dot[colorKey] && <span className="inspo-dot" style={{ background: dot[colorKey].hex }} aria-hidden="true" />}{piece}</li>
+                  <li key={index} dir="auto">{dots[colorKey] && <span className="inspo-dot" style={{ background: dots[colorKey].hex }} aria-hidden="true" />}{piece}</li>
                 ))}
               </ul>
             </li>
@@ -509,9 +507,9 @@ function ComboWindow({ fixed, source, favorites, onToggleFavorite, wishColors, o
               );
             })}
           </div>
-          {palette.source === "polyvore" && <PolyvoreLooks key={palette.key} palette={palette} />}
+          {palette.source === "mytheresa" && <SourceLooks key={palette.key} palette={palette} />}
           <div className="daily-combo__meta">
-            <p className="daily-combo__number">{fixed ? (palette.source === "polyvore" ? `ממאגר Polyvore: הופיע ב-${palette.outfits} לוקים` : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
+            <p className="daily-combo__number">{fixed ? (palette.source === "mytheresa" ? `מלוקים של Mytheresa: הופיע ב-${palette.outfits} לוקים` : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
             <HeartButton on={favorites.includes(palette.key)} onClick={() => onToggleFavorite(palette.key)} className="is-big" />
           </div>
         </div>
