@@ -69,8 +69,7 @@ const SHADE_COUNTS = Object.fromEntries(SOURCES.map((source) => {
   }
   return [source.id, counts];
 }));
-const SOURCE_KEY = "combos-source";
-const readSource = () => { try { return SOURCES.some((entry) => entry.id === localStorage.getItem(SOURCE_KEY)) ? localStorage.getItem(SOURCE_KEY) : "all"; } catch { return "all"; } };
+
 
 // Every recommended combination from Sanzo Wada's "A Dictionary of Colour
 // Combinations", filtered by a colour of the book or a scanned garment, with the
@@ -110,14 +109,28 @@ function HeartButton({ on, onClick, className = "" }) {
 export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) {
   const [favorites, toggleFavorite] = useComboFavorites(wardrobeId);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [source, setSourceState] = useState(readSource);
-  const setSource = (value) => { setSourceState(value); setShadeId(null); setFamilyId(null); try { localStorage.setItem(SOURCE_KEY, value); } catch { /* not kept */ } };
+  const [source, setSourceState] = useState("all");
+  const setSource = (value) => { setSourceState(value); setShadeIds([]); setFamilyIds([]); };
   // A combination opened from its card: its colours large, to add one to the Wishlist
   const [openKey, setOpenKey] = useState(null);
   const [wishColors, addWishColor] = useWishColors(wardrobeId);
-  const [shadeId, setShadeId] = useState(null);
-  const [familyId, setFamilyId] = useState(null);
+  // Several colours can be chosen: a combination has to have all of them. A shade
+  // chosen within a colour narrows that colour to the shade.
+  const [shadeIds, setShadeIds] = useState([]);
+  const [familyIds, setFamilyIds] = useState([]);
+  const toggleFamily = (id) => {
+    setFamilyIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
+    setShadeIds((current) => current.filter((sid) => SHADES[sid].family !== id));
+    setSamples([]);
+  };
+  const toggleShade = (id) => setShadeIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Cleared with the site's other filters after being away a while (see App)
+  useEffect(() => {
+    const reset = () => { setSourceState("all"); setShadeIds([]); setFamilyIds([]); setSize(0); setOnlyFavorites(false); setSamples([]); setPieceId(null); setFiltersOpen(false); };
+    window.addEventListener("wardrobe:reset-filters", reset);
+    return () => window.removeEventListener("wardrobe:reset-filters", reset);
+  }, []);
   const [dailyOpen, setDailyOpen] = useState(false);
   const [pieceId, setPieceId] = useState(null);
   const [size, setSize] = useState(0);
@@ -182,8 +195,12 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
     .filter(inSource(source))
     .filter((palette) => !onlyFavorites || favorites.includes(palette.key))
     .filter((palette) => !size || palette.colors.length === size)
-    .filter((palette) => !familyId || palette.colors.some((color) => color.family === familyId))
-    .filter((palette) => shadeId === null || palette.colors.some((color) => SHADE_OF.get(color) === shadeId))
+    .filter((palette) => familyIds.every((family) => {
+      const shadesHere = shadeIds.filter((sid) => SHADES[sid].family === family);
+      return shadesHere.length
+        ? palette.colors.some((color) => shadesHere.includes(SHADE_OF.get(color)))
+        : palette.colors.some((color) => color.family === family);
+    }))
     .filter((palette) => !piece || palette.colors.some((color) => Math.min(deltaE(piece.lab, color.lab), deltaE(piece.lab2, color.lab)) <= CLOSE))
     .map((palette) => {
       // The colour of the combination closest to each sampled colour, when close enough
@@ -194,14 +211,13 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
       });
       return { ...palette, sampledAt, sampled: sampledAt.filter((index) => index >= 0).length, matches: palette.colors.map(matchesFor) };
     }),
-  [shadeId, familyId, piece, samples, size, pieces, onlyFavorites, favorites, source]); // eslint-disable-line react-hooks/exhaustive-deps
+  [shadeIds, familyIds, piece, samples, size, pieces, onlyFavorites, favorites, source]); // eslint-disable-line react-hooks/exhaustive-deps
   // With sampled colours: the combinations that have all of them, or if there are
   // none, the ones that have the most of them
   const bestSampled = samples.length ? Math.max(0, ...candidates.map((palette) => palette.sampled)) : 0;
   const shown = samples.length ? candidates.filter((palette) => bestSampled > 0 && palette.sampled === bestSampled) : candidates;
 
-  const shade = shadeId === null ? null : SHADES[shadeId];
-  const active = Boolean(shade || familyId || piece || samples.length || size || onlyFavorites);
+  const active = Boolean(familyIds.length || piece || samples.length || size || onlyFavorites);
 
   return (
     <section className="combos" aria-label="שילובי צבעים">
@@ -240,7 +256,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
             <div className="combos__scan-actions">
               <span className="combos__scan-swatch" style={{ background: scan.hex }} aria-hidden="true" />
               <button type="button" className="combo__look" disabled={samples.some((sample) => sample.hex === scan.hex)} onClick={() => {
-                addSample(scan.hex); setPieceId(null); setShadeId(null); setFamilyId(null);
+                addSample(scan.hex); setPieceId(null); setShadeIds([]); setFamilyIds([]);
                 lastPhotoRef.current = { ...scan, canvas: canvasRef.current };
                 setScan(null);
                 requestAnimationFrame(() => scannedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -288,11 +304,10 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
           </div>
         )}
         {(() => {
-          const count = (source !== "all" ? 1 : 0) + (onlyFavorites ? 1 : 0) + (size ? 1 : 0) + (familyId ? 1 : 0);
-          const family = COLOR_FAMILIES.find((entry) => entry.id === familyId);
+          const count = (source !== "all" ? 1 : 0) + (onlyFavorites ? 1 : 0) + (size ? 1 : 0) + familyIds.length;
           const inThis = PALETTES.filter(inSource(source));
           const families = COLOR_FAMILIES.map((entry) => ({ ...entry, count: inThis.filter((palette) => palette.colors.some((c) => c.family === entry.id)).length })).filter((entry) => entry.count);
-          const familyShades = family ? (SHADE_ROWS.find((row) => row.id === family.id)?.shades || []).filter((entry) => SHADE_COUNTS[source].get(entry.id)) : [];
+          const shadesOf = (id) => (SHADE_ROWS.find((row) => row.id === id)?.shades || []).filter((entry) => SHADE_COUNTS[source].get(entry.id));
           const chip = (label, onRemove, extra = null) => (
             <button key={label} type="button" className="filter-chip is-on" onClick={onRemove}>{extra}{label}<X size={11} aria-label="הסרה" /></button>
           );
@@ -304,7 +319,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
                   <span>{count ? `סינון (${count})` : "סינון"}</span>
                 </button>
                 {active && (
-                  <button type="button" className="wardrobe-filters__clear" onClick={() => { setShadeId(null); setFamilyId(null); setPieceId(null); setSamples([]); setSize(0); setOnlyFavorites(false); setSource("all"); }}>
+                  <button type="button" className="wardrobe-filters__clear" onClick={() => { setShadeIds([]); setFamilyIds([]); setPieceId(null); setSamples([]); setSize(0); setOnlyFavorites(false); setSource("all"); }}>
                     <X size={13} aria-hidden="true" /> ניקוי
                   </button>
                 )}
@@ -313,7 +328,11 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
                     {source !== "all" && chip(SOURCES.find((entry) => entry.id === source).label, () => setSource("all"))}
                     {onlyFavorites && chip("מועדפים", () => setOnlyFavorites(false), <Heart size={11} weight="fill" aria-hidden="true" />)}
                     {size > 0 && chip(`${size} צבעים`, () => setSize(0))}
-                    {family && chip(shade ? shade.name : family.label, () => { setFamilyId(null); setShadeId(null); }, <span className="filter-chip__dot" style={{ background: shade ? shade.hex : family.swatch }} />)}
+                    {familyIds.map((id) => {
+                      const entry = COLOR_FAMILIES.find((f) => f.id === id);
+                      const picked = shadeIds.filter((sid) => SHADES[sid].family === id);
+                      return chip(picked.length ? `${entry.label} (${picked.length} גוונים)` : entry.label, () => toggleFamily(id), <span className="filter-chip__dot" style={{ background: picked.length === 1 ? SHADES[picked[0]].hex : entry.swatch }} />);
+                    })}
                   </div>
                 )}
               </div>
@@ -344,21 +363,25 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
                     <legend>צבע</legend>
                     <div className="wardrobe-filters__chips">
                       {families.map((entry) => (
-                        <button key={entry.id} type="button" className={`filter-chip${familyId === entry.id ? " is-on" : ""}`} aria-pressed={familyId === entry.id} onClick={() => { setFamilyId(familyId === entry.id ? null : entry.id); setShadeId(null); setSamples([]); }}>
+                        <button key={entry.id} type="button" className={`filter-chip${familyIds.includes(entry.id) ? " is-on" : ""}`} aria-pressed={familyIds.includes(entry.id)} onClick={() => toggleFamily(entry.id)}>
                           <span className="filter-chip__dot" style={{ background: entry.swatch }} />{entry.label}<small>{entry.count}</small>
                         </button>
                       ))}
                     </div>
-                    {familyShades.length > 1 && (
-                      <div className="combos__family-shades" role="group" aria-label={`גוונים של ${family.label}`}>
-                        <span>גוון:</span>
-                        {familyShades.map((entry) => (
-                          <button key={entry.id} type="button" className={`filter-chip combos__shade-chip${shadeId === entry.id ? " is-on" : ""}`} aria-pressed={shadeId === entry.id} title={entry.names} aria-label={`${entry.names}, ב-${SHADE_COUNTS[source].get(entry.id)} שילובים`} onClick={() => setShadeId(shadeId === entry.id ? null : entry.id)}>
-                            <span className="filter-chip__dot" style={{ background: entry.hex }} /><small>{SHADE_COUNTS[source].get(entry.id)}</small>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {familyIds.length > 1 && <p className="combos__multi-note">מוצגים שילובים שיש בהם את כל הצבעים שבחרת</p>}
+                    {familyIds.filter((id) => shadesOf(id).length > 1).map((id) => {
+                      const entry = COLOR_FAMILIES.find((f) => f.id === id);
+                      return (
+                        <div key={id} className="combos__family-shades" role="group" aria-label={`גוונים של ${entry.label}`}>
+                          <span>{entry.label}:</span>
+                          {shadesOf(id).map((shadeEntry) => (
+                            <button key={shadeEntry.id} type="button" className={`filter-chip combos__shade-chip${shadeIds.includes(shadeEntry.id) ? " is-on" : ""}`} aria-pressed={shadeIds.includes(shadeEntry.id)} title={shadeEntry.names} aria-label={`${shadeEntry.names}, ב-${SHADE_COUNTS[source].get(shadeEntry.id)} שילובים`} onClick={() => toggleShade(shadeEntry.id)}>
+                              <span className="filter-chip__dot" style={{ background: shadeEntry.hex }} /><small>{SHADE_COUNTS[source].get(shadeEntry.id)}</small>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </fieldset>
                   <button type="button" className="secondary-button wardrobe-filters__done" onClick={() => setFiltersOpen(false)}>סיום</button>
                 </div>
@@ -378,16 +401,17 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
               <HeartButton on={favorites.includes(palette.key)} onClick={() => toggleFavorite(palette.key)} className="is-over" />
               <button type="button" className="combo__swatches" onClick={() => setOpenKey(palette.key)} aria-label={`פתיחת שילוב ${palette.label}`}>
                 {palette.colors.map((color, index) => (
-                  <span key={index} className={`combo__swatch${(shade && SHADE_OF.get(color) === shadeId) || sampledColors.has(index) ? " is-picked" : ""}`} style={{ background: color.hex }} title={color.name} />
+                  <span key={index} className={`combo__swatch${shadeIds.includes(SHADE_OF.get(color)) || familyIds.includes(color.family) || sampledColors.has(index) ? " is-picked" : ""}`} style={{ background: color.hex }} title={color.name} />
                 ))}
               </button>
-              <p className="gallery-item__name combo__name">{palette.colors.map((color) => (color.source === "mytheresa" ? color.name : COLOR_FAMILIES.find((entry) => entry.id === color.family)?.label || color.name)).join(" · ")}</p>
-              <p className="gallery-item__brand combo__meta">{palette.source === "mytheresa" ? <>{palette.outfits} לוקים · <bdi>Mytheresa</bdi></> : <>ספר הצבעים היפני · <bdi>{palette.label}</bdi></>}</p>
-              {owned > 0 && (
-                <button type="button" className="wardrobe-filters__toggle combo__look-btn" onClick={() => onCreateLook(forLook(palette))}>
-                  <MagicWand size={14} aria-hidden="true" /> לוק מהשילוב
-                </button>
-              )}
+              <div className="combo__foot">
+                <span className="combo__number">{palette.source === "mytheresa" ? "Mytheresa" : palette.label}</span>
+                {owned > 0 && (
+                  <button type="button" className="combo__look" onClick={() => onCreateLook(forLook(palette))}>
+                    <MagicWand size={13} aria-hidden="true" /> לוק מהשילוב
+                  </button>
+                )}
+              </div>
             </article>
           );
         })}
@@ -478,7 +502,7 @@ function ComboWindow({ fixed, nav = {}, source, favorites, onToggleFavorite, wis
             <small dir="ltr">{[...new Set(palette.colors.map(searchWord))].join(" ")} outfit</small>
           </a>
           <div className="daily-combo__meta">
-            <p className="daily-combo__number">{fixed ? (palette.source === "mytheresa" ? `מלוקים של Mytheresa: הופיע ב-${palette.outfits} לוקים` : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
+            <p className="daily-combo__number">{fixed ? (palette.source === "mytheresa" ? "מהלוקים של Mytheresa" : "מספר הצבעים היפני") : `שילוב ${palette.label} מתוך ${pool.length} שילובים של ${size} צבעים`}</p>
             <HeartButton on={favorites.includes(palette.key)} onClick={() => onToggleFavorite(palette.key)} className="is-big" />
           </div>
         </div>

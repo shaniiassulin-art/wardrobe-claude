@@ -6,6 +6,7 @@ import { OptimizedImage } from "./OptimizedImage.jsx";
 import { fittedImage, imageFallback, thumbUrl, toBrowserImage } from "./image-files.js";
 import { ImageLightbox } from "./ImageLightbox.jsx";
 import { ModalArrows, stepsIn } from "./ModalArrows.jsx";
+import { useWishColors } from "./wish-colors.js";
 import { LuggageView, SuitcasePicker, newSuitcaseId } from "./Suitcases.jsx";
 import { EMPTY_FILTERS, WardrobeFilters, matchesFilters } from "./WardrobeFilters.jsx";
 import { PRICES, autoLooksPrice, lookOnModelPrice } from "./prices.js";
@@ -1505,7 +1506,7 @@ function StylingChoice({ label, value, options, onChange, disabled }) {
   );
 }
 
-function CustomOutfitModal({ items, modelRefUrl = null, onUpdateItem, initialItemIds = [], initialMode = "flatlay", initialNotes = "", initialStyling = null, editLook = null, palette = null, onClose, onCreated }) {
+function CustomOutfitModal({ items, modelRefUrl = null, onUpdateItem, initialItemIds = [], initialMode = "flatlay", initialNotes = "", initialStyling = null, editLook = null, palette = null, wardrobeId = "user-shani", onClose, onCreated }) {
   const [outfitMode, setOutfitMode] = useState(initialMode || "flatlay");
   const [selectedIds, setSelectedIds] = useState(() => [...initialItemIds]);
   const [outfitNotes, setOutfitNotes] = useState(initialNotes || "");
@@ -1516,6 +1517,7 @@ function CustomOutfitModal({ items, modelRefUrl = null, onUpdateItem, initialIte
   const [lookEvent, setLookEvent] = useState(() => [...new Set((editLook?.occasion || []).filter((value) => value !== "casual").map(eventLabel))].join(", "));
   const [lookTagText, setLookTagText] = useState(() => (editLook?.tags || []).join(", "));
   // A combination from the colour book: its colours, and how close each piece is to one of them
+  const [wishColors, addWishColor] = useWishColors(wardrobeId);
   const paletteColors = useMemo(() => (palette?.colors || []).map((color) => ({ ...color, lab: hexToLab(color.hex) })), [palette]);
   const paletteMatch = useMemo(() => {
     const map = new Map();
@@ -1895,6 +1897,31 @@ function CustomOutfitModal({ items, modelRefUrl = null, onUpdateItem, initialIte
                 </div>
               </div>
             )}
+            {palette && (() => {
+              // Colours of the combination with no piece in the wardrobe
+              const missing = paletteColors.filter((color, index) => ![...paletteMatch.values()].some((match) => match.index === index));
+              if (!missing.length) return null;
+              return (
+                <div className="lb-missing" role="status">
+                  <p>{missing.length === 1 ? "אין לך בארון בגד בצבע הזה:" : "אין לך בארון בגדים בצבעים האלה:"}</p>
+                  <ul>
+                    {missing.map((color) => {
+                      const wished = wishColors.some((wish) => wish.hex.toLowerCase() === color.hex.toLowerCase());
+                      return (
+                        <li key={color.hex}>
+                          <span className="inspo-dot" style={{ background: color.hex }} aria-hidden="true" />
+                          <span className="lb-missing__name">{color.name}</span>
+                          <button type="button" className={`daily-combo__wish-btn${wished ? " is-on" : ""}`} disabled={wished} onClick={() => addWishColor({ hex: color.hex, name: color.name, combo: palette.label || `#${palette.number}` })}>
+                            {wished ? <Check size={13} weight="bold" aria-hidden="true" /> : <Plus size={13} aria-hidden="true" />}
+                            <span>{wished ? "בווישליסט" : "לווישליסט"}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })()}
             {selectedItems.length > 0 ? (
               <div className="lb-chips">
                 {selectedItems.map((item) => (
@@ -2275,6 +2302,8 @@ function AutoOutfitsModal({ onClose, onCreated }) {
   );
 }
 
+const FILTERS_RESET_AFTER = 10 * 60 * 1000;
+
 export function App() {
   const [items, setItems] = useState([]);
   const [outfits, setOutfits] = useState([]);
@@ -2300,6 +2329,22 @@ export function App() {
   const [builderInitialItems, setBuilderInitialItems] = useState([]);
   const [builderInitialExtras, setBuilderInitialExtras] = useState({});
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  // Filters start fresh after leaving the site: when it comes back after being
+  // away (closed, or in the background) for a while, every filter is cleared
+  useEffect(() => {
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
+      if (hiddenAt && Date.now() - hiddenAt > FILTERS_RESET_AFTER) {
+        setFilters(EMPTY_FILTERS);
+        setLookFilters(EMPTY_LOOK_FILTERS);
+        window.dispatchEvent(new Event("wardrobe:reset-filters"));
+      }
+      hiddenAt = 0;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
   // One selection at a time: wardrobe items, looks, suitcases, Wishlist or archive.
   // Opening a selection of another kind closes the previous one.
   const [selectKind, setSelectKind] = useState(null);
@@ -3389,6 +3434,7 @@ export function App() {
       {builderOpen && (
         <CustomOutfitModal
           items={items}
+          wardrobeId={activeWardrobeId}
           onUpdateItem={saveItem}
           modelRefUrl={modelRefUrl}
           initialItemIds={builderInitialItems}
