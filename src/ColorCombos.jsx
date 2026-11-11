@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowsClockwise, Camera, CaretDown, Check, Funnel, Heart, ImageSquare, MagicWand, MagnifyingGlass, Plus, Sparkle, X } from "@phosphor-icons/react";
 import { COLOR_FAMILIES, colorFamily } from "./colors.js";
-import { CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
+import { ITEM_CLOSE, SAMPLE_CLOSE, deltaE, deltaE2000, hexToLab } from "./color-match.js";
 import { WADA_COLORS, WADA_PALETTES } from "./wada-palettes.js";
 import { ModalArrows, stepsIn } from "./ModalArrows.jsx";
 import { useWishColors } from "./wish-colors.js";
@@ -187,8 +187,8 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
 
   // For one colour of a combination: the wardrobe pieces close to it, closest first
   const matchesFor = (color) => pieces
-    .map((entry) => ({ ...entry, d: Math.min(deltaE(entry.lab, color.lab), deltaE(entry.lab2, color.lab)) }))
-    .filter((entry) => entry.d <= CLOSE)
+    .map((entry) => ({ ...entry, d: deltaE2000(entry.lab, color.lab) }))
+    .filter((entry) => entry.d <= ITEM_CLOSE)
     .sort((a, b) => a.d - b.d);
 
   const candidates = useMemo(() => PALETTES
@@ -201,7 +201,7 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
         ? palette.colors.some((color) => shadesHere.includes(SHADE_OF.get(color)))
         : palette.colors.some((color) => color.family === family);
     }))
-    .filter((palette) => !piece || palette.colors.some((color) => Math.min(deltaE(piece.lab, color.lab), deltaE(piece.lab2, color.lab)) <= CLOSE))
+    .filter((palette) => !piece || palette.colors.some((color) => deltaE2000(piece.lab, color.lab) <= ITEM_CLOSE))
     .map((palette) => {
       // The colour of the combination closest to each sampled colour, when close enough
       const sampledAt = samples.map((sample) => {

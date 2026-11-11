@@ -16,10 +16,16 @@ import { ChatGptHelper } from "./ChatGptHelper.jsx";
 import { InspirationModal } from "./InspirationModal.jsx";
 import { WishlistView } from "./WishlistView.jsx";
 // Loaded only when the page is opened (it carries the book's palettes)
-const ColorCombos = lazy(() => import("./ColorCombos.jsx").then((module) => ({ default: module.ColorCombos })));
+const loadColorCombos = () => import("./ColorCombos.jsx");
+const ColorCombos = lazy(() => loadColorCombos().then((module) => ({ default: module.ColorCombos })));
+// Fetched in the background once the site has loaded, so the tab opens at once
+if (typeof window !== "undefined") {
+  const later = window.requestIdleCallback || ((fn) => setTimeout(fn, 2500));
+  window.addEventListener("load", () => later(() => { loadColorCombos().catch(() => {}); }), { once: true });
+}
 import { EMPTY_LOOK_FILTERS, LookFilters, eventLabel, lookEvents, matchesLookFilters } from "./LookFilters.jsx";
 import { fitForPart, lengthOptions } from "./fit-options.js";
-import { CLOSE, hexToLab, itemDistance } from "./color-match.js";
+import { ITEM_CLOSE, hexToLab, itemDistance } from "./color-match.js";
 import { revealChildren, revealWords, startSmoothScroll, tiltHandlers, watchOverlays } from "./motion.js";
 
 // Page heading whose words fade in from a soft blur
@@ -1526,7 +1532,7 @@ function CustomOutfitModal({ items, modelRefUrl = null, onUpdateItem, initialIte
       let best = null;
       paletteColors.forEach((color, index) => {
         const d = itemDistance(item, color.lab);
-        if (d <= CLOSE && (!best || d < best.d)) best = { d, index };
+        if (d <= ITEM_CLOSE && (!best || d < best.d)) best = { d, index };
       });
       if (best) map.set(item.id, best);
     }

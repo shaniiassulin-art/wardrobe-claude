@@ -15,8 +15,7 @@ export const deltaE = (a, b) => (a && b ? Math.hypot(a[0] - b[0], a[1] - b[1], a
 // A wardrobe colour counts as "this colour of the combination" within this distance
 export const CLOSE = 22;
 
-// How close a wardrobe piece is to a colour (its main or second colour)
-export const itemDistance = (item, lab) => Math.min(deltaE(hexToLab(item.color), lab), deltaE(hexToLab(item.secondaryColor), lab));
+
 
 // CIEDE2000: the closest formula to how the eye judges colour difference
 // (ΔE76 above treats saturated colours as further apart than they look)
@@ -54,3 +53,9 @@ export function deltaE2000(a, b) {
 }
 // A sampled colour counts as a colour of the combination only when this close (ΔE2000)
 export const SAMPLE_CLOSE = 7;
+
+// A wardrobe piece counts as being in a colour only when its main colour looks
+// the same (ΔE2000), so the look builder and the combinations never stretch a
+// piece's real colour to fit
+export const ITEM_CLOSE = 9;
+export const itemDistance = (item, lab) => deltaE2000(hexToLab(item.color), lab);
