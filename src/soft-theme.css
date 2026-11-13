@@ -1293,3 +1293,6 @@ button.combo__swatches { width: 100%; padding: 0; border: 0; background: none; c
 .combos__search-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 48px; border: 0; border-radius: 999px; background: var(--ink); color: var(--paper); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(46, 42, 38, .18); }
 .combos__more-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
 .combos__more-btn:disabled { color: var(--muted); cursor: default; }
+/* The search button the same size as the site's other buttons */
+.combos__search-btn { height: 40px; font-size: 13px; font-weight: 400; box-shadow: none; gap: 6px; }
+.combos__search-btn svg { width: 14px; height: 14px; }
