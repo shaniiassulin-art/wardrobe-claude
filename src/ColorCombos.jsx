@@ -246,24 +246,44 @@ export function ColorCombos({ items, wardrobeId = "user-shani", onCreateLook }) 
         {scan && (
           <div className="combos__scan">
             <div className="combos__scan-top">
-              <p className="combos__scan-hint">געי בצבע בתמונה ולחצי "הוספת הצבע"</p>
+              <p className="combos__scan-hint">געי בתמונה בצבע שאת רוצה, ואז "חיפוש שילובים"</p>
               <button type="button" className="lb-close combos__scanned-x" onClick={() => setScan(null)} aria-label="סגירת התמונה"><X size={14} /></button>
             </div>
             <div className="combos__scan-photo" onClick={pickAt} role="button" tabIndex={0} aria-label="בחירת הצבע בתמונה">
               <img src={scan.photo} alt="התמונה לדגימה" />
               <span className="combos__scan-mark" style={{ left: `${scan.x * 100}%`, top: `${scan.y * 100}%`, background: scan.hex }} aria-hidden="true" />
             </div>
-            <div className="combos__scan-actions">
-              <span className="combos__scan-swatch" style={{ background: scan.hex }} aria-hidden="true" />
-              <button type="button" className="combo__look" disabled={samples.some((sample) => sample.hex === scan.hex)} onClick={() => {
-                addSample(scan.hex); setPieceId(null); setShadeIds([]); setFamilyIds([]);
+            {(() => {
+              const taken = samples.some((sample) => sample.hex === scan.hex);
+              // Add this colour (once) and leave the photo open to take another
+              const keep = () => { if (!taken) addSample(scan.hex); setPieceId(null); setShadeIds([]); setFamilyIds([]); };
+              const search = () => {
+                keep();
                 lastPhotoRef.current = { ...scan, canvas: canvasRef.current };
                 setScan(null);
                 requestAnimationFrame(() => scannedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-              }}>
-                <Plus size={13} aria-hidden="true" /> {samples.some((sample) => sample.hex === scan.hex) ? "נוסף" : "הוספת הצבע"}
-              </button>
-            </div>
+              };
+              return (
+                <>
+                  <div className="combos__scan-picked">
+                    <span className="combos__scan-swatch" style={{ background: scan.hex }} aria-hidden="true" />
+                    <span>הצבע שנבחר</span>
+                    {samples.length > 0 && (
+                      <span className="combos__samples combos__scan-taken" aria-label="צבעים שכבר נדגמו">
+                        {samples.map((sample) => <span key={sample.id} className="combos__sample is-small" style={{ background: sample.hex }} />)}
+                      </span>
+                    )}
+                  </div>
+                  <button type="button" className="combos__search-btn" onClick={search}>
+                    <MagnifyingGlass size={17} aria-hidden="true" />
+                    {samples.length + (taken ? 0 : 1) > 1 ? `חיפוש שילובים ל-${samples.length + (taken ? 0 : 1)} הצבעים` : "חיפוש שילובים לצבע הזה"}
+                  </button>
+                  <button type="button" className="combos__more-btn" disabled={taken} onClick={keep}>
+                    {taken ? <><Check size={13} aria-hidden="true" /> הצבע נוסף. געי בצבע אחר</> : <><Plus size={13} aria-hidden="true" /> הוספה ודגימת צבע נוסף</>}
+                  </button>
+                </>
+              );
+            })()}
             <div className="combos__scan-actions">
               <button type="button" className="filter-chip" onClick={() => fileRef.current?.click()}><Camera size={13} aria-hidden="true" /> צילום אחר</button>
               <button type="button" className="filter-chip" onClick={() => galleryRef.current?.click()}><ImageSquare size={13} aria-hidden="true" /> תמונה אחרת מהגלריה</button>
